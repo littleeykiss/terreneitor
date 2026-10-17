@@ -18,6 +18,7 @@ export interface MapViewProps extends Omit<RNMapViewProps, 'onPress'> {
   initialRegion?: MapRegion;
   centerCoordinate?: Coordinate | null;
   onMapPress?: (coord: Coordinate) => void;
+  onPolygonPress?: (polygon: TerrainPolygon) => void;
   activePoints?: Coordinate[];
   polygons?: TerrainPolygon[];
   children?: React.ReactNode;
@@ -26,6 +27,7 @@ export interface MapViewProps extends Omit<RNMapViewProps, 'onPress'> {
 export default function MapView({
   centerCoordinate,
   onMapPress,
+  onPolygonPress,
   activePoints = [],
   polygons = [],
   children,
@@ -75,7 +77,7 @@ export default function MapView({
         />
       ))}
 
-      {/* 3. Polígonos de terrenos ya terminados */}
+      {/* 3. Polígonos de terrenos ya terminados con soporte para clic */}
       {polygons.map((poly) => (
         <Polygon
           key={poly.id}
@@ -83,6 +85,8 @@ export default function MapView({
           strokeColor={poly.color || '#10b981'}
           fillColor="rgba(16, 185, 129, 0.35)"
           strokeWidth={3}
+          tappable
+          onPress={() => onPolygonPress?.(poly)}
         />
       ))}
 

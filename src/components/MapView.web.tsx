@@ -16,6 +16,7 @@ export interface MapViewProps {
   centerCoordinate?: Coordinate | null;
   mapType?: 'standard' | 'satellite' | 'hybrid';
   onMapPress?: (coord: Coordinate) => void;
+  onPolygonPress?: (polygon: TerrainPolygon) => void;
   activePoints?: Coordinate[];
   polygons?: TerrainPolygon[];
   children?: React.ReactNode;
@@ -26,6 +27,7 @@ export default function MapView({
   initialRegion,
   centerCoordinate,
   onMapPress,
+  onPolygonPress,
   activePoints = [],
   polygons = [],
   children,
@@ -33,25 +35,50 @@ export default function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
 
-  // Guardamos las capas de Leaflet en refs para manipularlas sin reconstruir el mapa:
   const drawLayerRef = useRef<L.LayerGroup | null>(null);
   const polygonLayerRef = useRef<L.LayerGroup | null>(null);
 
-  // Mantenemos una referencia al callback actual para evitar cierres obsoletos (stale closures):
   const onMapPressRef = useRef(onMapPress);
   useEffect(() => {
     onMapPressRef.current = onMapPress;
   }, [onMapPress]);
 
-  // Inicialización del mapa (solo corre una vez al montar):
+  const onPolygonPressRef = useRef(onPolygonPress);
   useEffect(() => {
-    const cssId = 'leaflet-css';
+    onPolygonPressRef.current = onPolygonPress;
+  }, [onPolygonPress]);
+
+  // Inicialización del mapa:
+  useEffect(() => {
+    // Inyectar CSS de Leaflet y estilo para etiquetas de terrenos
+    const cssId = 'leaflet-custom-css';
     if (!document.getElementById(cssId)) {
       const link = document.createElement('link');
-      link.id = cssId;
+      link.id = 'leaflet-css';
       link.rel = 'stylesheet';
       link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
       document.head.appendChild(link);
+
+      const styleEl = document.createElement('style');
+      styleEl.id = cssId;
+      styleEl.innerHTML = `
+        .polygon-label {
+          background: rgba(15, 23, 42, 0.9) !important;
+          border: 1px solid #10b981 !important;
+          color: #ffffff !important;
+          font-weight: 600 !important;
+          font-size: 11px !important;
+          padding: 3px 8px !important;
+          border-radius: 6px !important;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
+          text-align: center !important;
+          white-space: nowrap !important;
+        }
+        .polygon-label::before {
+          display: none !important;
+        }
+      `;
+      document.head.appendChild(styleEl);
     }
 
     if (!containerRef.current || mapInstanceRef.current) return;
@@ -61,22 +88,22 @@ export default function MapView({
 
     const map = L.map(containerRef.current, {
       zoomControl: true,
-    }).setView([lat, lng], 15);
+      maxZoom: 22, // Permite zoom profundo
+    }).setView([lat, lng], 16);
 
-    // Esri World Imagery (satelital gratis)
-    L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      {
-        attribution: 'Tiles &copy; Esri',
-        maxZoom: 19,
-      }
-    ).addTo(map);
+    // SOLUCIÓN AL ZOOM QUE SE ROMPÍA:
+    // Usamos capa satelital híbrida (Google Hybrid con satélite + nombres de calles)
+    // Con maxNativeZoom: 20 y maxZoom: 22, Leaflet escala los mosaicos si el usuario
+    // hace zoom extremo, evitando que se muestren cuadros grises o rotos.
+    L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      attribution: 'Google Maps Satellite',
+      maxZoom: 22,
+      maxNativeZoom: 20,
+    }).addTo(map);
 
-    // Capas para dibujo y polígonos guardados
     drawLayerRef.current = L.layerGroup().addTo(map);
     polygonLayerRef.current = L.layerGroup().addTo(map);
 
-    // Listener de clic en el mapa:
     map.on('click', (e: L.LeafletMouseEvent) => {
       if (onMapPressRef.current) {
         onMapPressRef.current({
@@ -104,7 +131,7 @@ export default function MapView({
     };
   }, []);
 
-  // Efecto reactivo: Redibuja los puntos y líneas en proceso de dibujo
+  // Efecto reactivo: Vértices y líneas de dibujo en curso
   useEffect(() => {
     if (!drawLayerRef.current) return;
     drawLayerRef.current.clearLayers();
@@ -116,7 +143,6 @@ export default function MapView({
       pt.longitude,
     ]);
 
-    // Dibuja la línea que conecta los puntos
     if (latLngs.length > 1) {
       L.polyline(latLngs, {
         color: '#38bdf8',
@@ -125,19 +151,18 @@ export default function MapView({
       }).addTo(drawLayerRef.current);
     }
 
-    // Dibuja un marcador circular en cada vértice marcado
     latLngs.forEach(([lat, lng], index) => {
       L.circleMarker([lat, lng], {
         radius: 6,
         color: '#0284c7',
-        fillColor: index === 0 ? '#22c55e' : '#ffffff', // El primer punto en verde
+        fillColor: index === 0 ? '#22c55e' : '#ffffff',
         fillOpacity: 1,
         weight: 2,
       }).addTo(drawLayerRef.current!);
     });
   }, [activePoints]);
 
-  // Efecto reactivo: Redibuja los polígonos ya terminados
+  // Efecto reactivo: Polígonos guardados con etiquetas de nombre y área
   useEffect(() => {
     if (!polygonLayerRef.current) return;
     polygonLayerRef.current.clearLayers();
@@ -149,22 +174,46 @@ export default function MapView({
       ]);
 
       if (latLngs.length >= 3) {
-        L.polygon(latLngs, {
+        const polyLayer = L.polygon(latLngs, {
           color: poly.color || '#10b981',
           fillColor: poly.color || '#10b981',
           fillOpacity: 0.35,
           weight: 3,
         }).addTo(polygonLayerRef.current!);
+
+        // Etiqueta flotante permanente sobre el polígono
+        if (poly.name) {
+          const areaText = poly.areaM2
+            ? `<div style="color: #38bdf8; font-size: 10px;">${poly.areaM2.toLocaleString('es-MX', { maximumFractionDigits: 1 })} m²</div>`
+            : '';
+
+          polyLayer.bindTooltip(
+            `<div><b>${poly.name}</b>${areaText}</div>`,
+            {
+              permanent: true,
+              direction: 'center',
+              className: 'polygon-label',
+            }
+          );
+        }
+
+        // Al hacer clic en un polígono existente
+        polyLayer.on('click', (e: L.LeafletMouseEvent) => {
+          L.DomEvent.stopPropagation(e);
+          if (onPolygonPressRef.current) {
+            onPolygonPressRef.current(poly);
+          }
+        });
       }
     });
   }, [polygons]);
 
-  // Efecto reactivo: Mueve la cámara suavemente al centro buscado
+  // Efecto reactivo: Mover cámara con animación suave
   useEffect(() => {
     if (!mapInstanceRef.current || !centerCoordinate) return;
     mapInstanceRef.current.flyTo(
       [centerCoordinate.latitude, centerCoordinate.longitude],
-      16,
+      17,
       { duration: 1.5 }
     );
   }, [centerCoordinate]);

@@ -15,6 +15,7 @@ export interface MapViewProps {
   centerCoordinate?: Coordinate | null;
   mapType?: 'standard' | 'satellite' | 'hybrid';
   onMapPress?: (coord: Coordinate) => void;
+  onPolygonPress?: (polygon: TerrainPolygon) => void;
   activePoints?: Coordinate[];
   polygons?: TerrainPolygon[];
   children?: React.ReactNode;

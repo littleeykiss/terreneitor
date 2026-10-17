@@ -8,12 +8,7 @@ export interface PlaceResult {
 }
 
 /**
- * Servicio de Geocodificación (Búsqueda de lugares):
- * Similar a una clase Service en Spring Boot (@Service public class GeocodingService { ... }).
- *
- * Usa el servicio gratuito OpenStreetMap Nominatim:
- * - No requiere tarjetas de crédito ni claves API de pago al inicio.
- * - Funciona de forma idéntica en Web, Android e iOS.
+ * Búsqueda hacia adelante (texto -> coordenadas)
  */
 export async function searchPlaces(query: string): Promise<PlaceResult[]> {
   if (!query || query.trim().length < 2) {
@@ -26,7 +21,7 @@ export async function searchPlaces(query: string): Promise<PlaceResult[]> {
 
     const response = await fetch(url, {
       headers: {
-        'Accept-Language': 'es', // Preferir resultados en español
+        'Accept-Language': 'es',
       },
     });
 
@@ -48,5 +43,27 @@ export async function searchPlaces(query: string): Promise<PlaceResult[]> {
   } catch (error) {
     console.error('Error buscando lugares:', error);
     return [];
+  }
+}
+
+/**
+ * Geocodificación inversa (coordenadas -> dirección aproximada)
+ * Permite autollenar la dirección cuando el usuario cierra un terreno en el mapa.
+ */
+export async function reverseGeocode(coord: Coordinate): Promise<string> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coord.latitude}&lon=${coord.longitude}&addressdetails=1`;
+    const response = await fetch(url, {
+      headers: {
+        'Accept-Language': 'es',
+      },
+    });
+
+    if (!response.ok) return '';
+    const data = await response.json();
+    return data.display_name || '';
+  } catch (error) {
+    console.error('Error en geocodificación inversa:', error);
+    return '';
   }
 }
