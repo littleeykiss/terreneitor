@@ -12,6 +12,7 @@ import {
   Keyboard,
   Image,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import MapView from './src/components/MapView';
@@ -24,6 +25,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Linking } from 'react-native';
 
 export default function App() {
+  const { width: screenWidth } = useWindowDimensions();
+  const isSmallScreen = screenWidth < 500;
+
   // ==========================================
   // ESTADOS DEL MAPA Y DIBUJO
   // ==========================================
@@ -348,22 +352,22 @@ export default function App() {
               <ActivityIndicator size="small" color="#38bdf8" style={styles.spinner} />
             ) : (
               <TouchableOpacity
-                style={styles.searchButton}
+                style={[styles.searchButton, isSmallScreen && styles.iconOnlyBtn]}
                 onPress={handleSearch}
                 activeOpacity={0.8}
               >
-                <Text style={styles.searchButtonText}>Buscar</Text>
+                <Text style={styles.searchButtonText}>{isSmallScreen ? '🔍' : 'Buscar'}</Text>
               </TouchableOpacity>
             )}
           </View>
 
           <TouchableOpacity
-            style={styles.catalogButton}
+            style={[styles.catalogButton, isSmallScreen && styles.catalogButtonSmall]}
             onPress={() => setShowCatalogModal(true)}
             activeOpacity={0.8}
           >
             <Text style={styles.catalogButtonText}>
-              📁 Bodega ({polygons.length})
+              📁 {isSmallScreen ? `(${polygons.length})` : `Bodega (${polygons.length})`}
             </Text>
           </TouchableOpacity>
         </View>
@@ -393,36 +397,39 @@ export default function App() {
       {/* Esquina inferior derecha, debajo de controles zoom  */}
       {/* =================================================== */}
       <TouchableOpacity
-        style={styles.floatingLayerBtn}
+        style={[styles.floatingLayerBtn, isSmallScreen && styles.floatingLayerBtnSmall]}
         onPress={() => setMapLayer((prev) => (prev === 'satellite' ? 'relief' : 'satellite'))}
         activeOpacity={0.8}
       >
         <Text style={styles.floatingLayerBtnText}>
-          {mapLayer === 'satellite' ? '⛰️ Relieve' : '🛰️ Satélite'}
+          {isSmallScreen 
+            ? (mapLayer === 'satellite' ? '⛰️' : '🛰️')
+            : (mapLayer === 'satellite' ? '⛰️ Relieve' : '🛰️ Satélite')}
         </Text>
       </TouchableOpacity>
 
       {/* =================================================== */}
       {/* PANEL INFERIOR: CONTROLES DE DIBUJO                */}
+      {/* Centrado firmemente en la parte inferior            */}
       {/* =================================================== */}
-      <View style={styles.controlPanel}>
+      <View style={!isDrawing ? styles.centeredDrawContainer : styles.controlPanel}>
         {!isDrawing ? (
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={styles.primaryCircleButton}
             onPress={() => {
               setSearchResults([]);
               setIsDrawing(true);
             }}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            <Text style={styles.primaryButtonText}>✏️ Dibujar terreno</Text>
+            <Text style={styles.primaryCircleIcon}>✏️</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.drawingControls}>
             <View style={styles.statusRow}>
               <Text style={styles.statusText}>
                 📍 Vértices: <Text style={styles.boldText}>{activePoints.length}</Text>
-                {activePoints.length < 3 && ' (mínimo 3 para cerrar)'}
+                {activePoints.length < 3 && ' (mínimo 3)'}
               </Text>
               <Text style={styles.hintText}>Toca el mapa para agregar límites</Text>
             </View>
@@ -437,7 +444,9 @@ export default function App() {
                 onPress={handleUndo}
                 disabled={activePoints.length === 0}
               >
-                <Text style={styles.actionButtonText}>↩ Deshacer</Text>
+                <Text style={styles.actionButtonText}>
+                  {isSmallScreen ? '↩' : '↩ Deshacer'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -449,14 +458,18 @@ export default function App() {
                 onPress={handleFinishDrawing}
                 disabled={activePoints.length < 3}
               >
-                <Text style={styles.actionButtonText}>✓ Terminar</Text>
+                <Text style={styles.actionButtonText}>
+                  {isSmallScreen ? '✓' : '✓ Terminar'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.actionButton, styles.cancelButton]}
                 onPress={handleCancel}
               >
-                <Text style={styles.actionButtonText}>✕ Cancelar</Text>
+                <Text style={styles.actionButtonText}>
+                  {isSmallScreen ? '✕' : '✕ Cancelar'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1134,32 +1147,79 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   // ==========================================
-  // PANEL DE DIBUJO RESPONSIVO
-  // ==========================================
-  controlPanel: {
-    position: 'absolute',
-    bottom: 24,
-    left: 12,
-    right: 90, // Deja espacio para el botón de relieve a la derecha
-    alignItems: 'center',
-    zIndex: 1000,
-    maxWidth: 420,
-  },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
+	// PANEL DE DIBUJO RESPONSIVO
+	// ==========================================
+	controlPanel: {
+		position: 'absolute',
+		bottom: 24,
+		left: 12,
+		right: 90, // Deja espacio para el botón de relieve a la derecha
+		alignItems: 'center',
+		zIndex: 1000,
+		maxWidth: 420,
+	},
+	centeredDrawContainer: {
+		position: 'absolute',
+		bottom: 24,
+		left: 0,
+		right: 0,
+		alignItems: 'center',
+		justifyContent: 'center',
+		zIndex: 1000,
+		pointerEvents: 'box-none',
+	} as any,
+	primaryCircleButton: {
+		width: 58,
+		height: 58,
+		borderRadius: 29,
+		backgroundColor: '#2563eb',
+		alignItems: 'center',
+		justifyContent: 'center',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.4,
+		shadowRadius: 8,
+		elevation: 10,
+		borderWidth: 2,
+		borderColor: 'rgba(255, 255, 255, 0.25)',
+		cursor: 'pointer',
+	} as any,
+	primaryCircleIcon: {
+		fontSize: 26,
+	},
+	iconOnlyBtn: {
+		paddingHorizontal: 10,
+		paddingVertical: 7,
+		borderRadius: 18,
+	},
+	catalogButtonSmall: {
+		paddingHorizontal: 10,
+		paddingVertical: 10,
+	},
+	floatingLayerBtnSmall: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		paddingHorizontal: 0,
+		paddingVertical: 0,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	primaryButton: {
+		backgroundColor: '#2563eb',
+		paddingVertical: 12,
+		paddingHorizontal: 20,
+		borderRadius: 25,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.35,
+		shadowRadius: 6,
+		elevation: 8,
+	},
+	primaryButtonText: {
+		color: '#ffffff',
+		fontSize: 14,
+		fontWeight: 'bold',
   },
   drawingControls: {
     backgroundColor: 'rgba(15, 23, 42, 0.94)',
