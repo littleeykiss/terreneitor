@@ -388,133 +388,156 @@ export default function App() {
               {editingTerrain ? '✏️ Editar Ficha de Terreno' : '🏷️ Guardar Terreno'}
             </Text>
 
-            {/* Ficha de área calculada */}
-            <View style={styles.areaBadge}>
-              <Text style={styles.areaBadgeTitle}>Área calculada:</Text>
-              <Text style={styles.areaBadgeValue}>
-                {calculatedArea.areaM2.toLocaleString('es-MX')} m²
-                <Text style={styles.areaBadgeSub}> ({calculatedArea.areaHectares} ha)</Text>
-              </Text>
-            </View>
-
-            {/* Selector de Estado Comercial */}
-            <Text style={styles.inputLabel}>Estado comercial:</Text>
-            <View style={styles.statusSelector}>
-              {(['disponible', 'apartado', 'vendido'] as TerrainStatus[]).map((st) => {
-                const isActive = lotStatus === st;
-                return (
-                  <TouchableOpacity
-                    key={st}
-                    style={[
-                      styles.statusOption,
-                      isActive && (
-                        st === 'disponible' ? styles.statusOptDisponible :
-                        st === 'apartado' ? styles.statusOptApartado :
-                        styles.statusOptVendido
-                      ),
-                    ]}
-                    onPress={() => setLotStatus(st)}
-                  >
-                    <Text
-                      style={[
-                        styles.statusOptionText,
-                        isActive && styles.statusOptionTextActive,
-                      ]}
-                    >
-                      {st === 'disponible' ? '🟢 Disponible' :
-                       st === 'apartado' ? '🟡 Apartado' : '🔴 Vendido'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Campo: Nombre / Etiqueta */}
-            <Text style={styles.inputLabel}>Nombre o Etiqueta:</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ej. Lote 14 - Fracc. El Roble"
-              placeholderTextColor="#64748b"
-              value={lotName}
-              onChangeText={setLotName}
-            />
-
-            {/* Campo: Precio */}
-            <Text style={styles.inputLabel}>Precio en MXN (opcional):</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ej. 1250000"
-              placeholderTextColor="#64748b"
-              keyboardType="numeric"
-              value={lotPrice}
-              onChangeText={setLotPrice}
-            />
-
-            {/* Campo: Dirección */}
-            <View style={styles.labelRow}>
-              <Text style={styles.inputLabel}>Dirección / Ubicación:</Text>
-              {isReverseGeocoding && (
-                <Text style={styles.detectingText}>Detectando dirección...</Text>
-              )}
-            </View>
-            <TextInput
-              style={[styles.modalInput, styles.addressInput]}
-              placeholder="Ubicación o referencia"
-              placeholderTextColor="#64748b"
-              value={lotAddress}
-              onChangeText={setLotAddress}
-              multiline
-            />
-
-            {/* Campo: Dueño */}
-            <Text style={styles.inputLabel}>Dueño / Propietario (opcional):</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ej. Juan Pérez García"
-              placeholderTextColor="#64748b"
-              value={lotOwner}
-              onChangeText={setLotOwner}
-            />
-
-            {/* Campo: Teléfono */}
-            <Text style={styles.inputLabel}>Teléfono de contacto (opcional):</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ej. 3312345678"
-              placeholderTextColor="#64748b"
-              keyboardType="phone-pad"
-              value={lotPhone}
-              onChangeText={setLotPhone}
-            />
-
-            {/* Campo: Notas */}
-            <Text style={styles.inputLabel}>Notas rápidas (opcional):</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ej. Terreno plano, agua y luz..."
-              placeholderTextColor="#64748b"
-              value={lotNotes}
-              onChangeText={setLotNotes}
-            />
-
-            {/* Botones del Modal */}
-            <View style={styles.modalButtonRow}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowSaveModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalSaveButton}
-                onPress={handleConfirmSave}
-              >
-                <Text style={styles.modalSaveText}>
-                  {editingTerrain ? '💾 Guardar Cambios' : '💾 Guardar en Bodega'}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={styles.modalScroll}
+            >
+              {/* Ficha de área calculada */}
+              <View style={styles.areaBadge}>
+                <Text style={styles.areaBadgeTitle}>Área calculada:</Text>
+                <Text style={styles.areaBadgeValue}>
+                  {calculatedArea.areaM2.toLocaleString('es-MX')} m²
+                  <Text style={styles.areaBadgeSub}> ({calculatedArea.areaHectares} ha)</Text>
                 </Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+
+              {/* Selector de Estado Comercial */}
+              <Text style={styles.inputLabel}>Estado comercial:</Text>
+              <View style={styles.statusSelector}>
+                {(['disponible', 'apartado', 'vendido'] as TerrainStatus[]).map((st) => {
+                  const isActive = lotStatus === st;
+                  return (
+                    <TouchableOpacity
+                      key={st}
+                      style={[
+                        styles.statusOption,
+                        isActive && (
+                          st === 'disponible' ? styles.statusOptDisponible :
+                          st === 'apartado' ? styles.statusOptApartado :
+                          styles.statusOptVendido
+                        ),
+                      ]}
+                      onPress={() => setLotStatus(st)}
+                    >
+                      <Text
+                        style={[
+                          styles.statusOptionText,
+                          isActive && styles.statusOptionTextActive,
+                        ]}
+                      >
+                        {st === 'disponible' ? '🟢 Disponible' :
+                         st === 'apartado' ? '🟡 Apartado' : '🔴 Vendido'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Campo: Nombre / Etiqueta */}
+              <Text style={styles.inputLabel}>Nombre o Etiqueta:</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Ej. Lote 14 - Fracc. El Roble"
+                placeholderTextColor="#64748b"
+                value={lotName}
+                onChangeText={setLotName}
+              />
+
+              {/* Campo: Precio */}
+              <Text style={styles.inputLabel}>Precio en MXN (opcional):</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Ej. 1250000"
+                placeholderTextColor="#64748b"
+                keyboardType="numeric"
+                value={lotPrice}
+                onChangeText={setLotPrice}
+              />
+
+              {/* Campo: Dirección */}
+              <View style={styles.labelRow}>
+                <Text style={styles.inputLabel}>Dirección / Ubicación:</Text>
+                {isReverseGeocoding && (
+                  <Text style={styles.detectingText}>Detectando dirección...</Text>
+                )}
+              </View>
+              <TextInput
+                style={[styles.modalInput, styles.addressInput]}
+                placeholder="Ubicación o referencia"
+                placeholderTextColor="#64748b"
+                value={lotAddress}
+                onChangeText={setLotAddress}
+                multiline
+              />
+
+              {/* Campo: Dueño */}
+              <Text style={styles.inputLabel}>Dueño / Propietario (opcional):</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Ej. Juan Pérez García"
+                placeholderTextColor="#64748b"
+                value={lotOwner}
+                onChangeText={setLotOwner}
+              />
+
+              {/* Campo: Teléfono */}
+              <Text style={styles.inputLabel}>Teléfono de contacto (opcional):</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Ej. 3312345678"
+                placeholderTextColor="#64748b"
+                keyboardType="phone-pad"
+                value={lotPhone}
+                onChangeText={setLotPhone}
+              />
+
+              {/* Campo: Notas */}
+              <Text style={styles.inputLabel}>Notas rápidas (opcional):</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Ej. Terreno plano, agua y luz..."
+                placeholderTextColor="#64748b"
+                value={lotNotes}
+                onChangeText={setLotNotes}
+              />
+
+              {/* Botón: Cómo llegar — visible solo al editar un terreno guardado */}
+              {editingTerrain && (
+                <TouchableOpacity
+                  style={styles.mapsButtonModal}
+                  onPress={() => {
+                    const coords = editingTerrain.coordinates;
+                    const cLat = coords.reduce((s, c) => s + c.latitude, 0) / coords.length;
+                    const cLng = coords.reduce((s, c) => s + c.longitude, 0) / coords.length;
+                    Linking.openURL(
+                      `https://www.google.com/maps/search/?api=1&query=${cLat},${cLng}`
+                    );
+                  }}
+                >
+                  <Text style={styles.mapsButtonModalText}>🗺️  Cómo llegar — Abrir en Google Maps</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Botones del Modal */}
+              <View style={styles.modalButtonRow}>
+                <TouchableOpacity
+                  style={styles.modalCancelButton}
+                  onPress={() => setShowSaveModal(false)}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.modalSaveButton}
+                  onPress={handleConfirmSave}
+                >
+                  <Text style={styles.modalSaveText}>
+                    {editingTerrain ? '💾 Guardar Cambios' : '💾 Guardar en Bodega'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -901,9 +924,12 @@ const styles = StyleSheet.create({
   modalCard: {
     backgroundColor: '#0f172a',
     borderRadius: 20,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 8,
     width: '100%',
     maxWidth: 480,
+    maxHeight: '90%',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
     shadowColor: '#000',
@@ -911,6 +937,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 16,
     elevation: 20,
+  },
+  modalScroll: {
+    flexGrow: 0,
   },
   modalTitle: {
     color: '#ffffff',
@@ -1232,6 +1261,21 @@ const styles = StyleSheet.create({
   mapsButtonText: {
     color: '#6ee7b7',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  // Botón de Google Maps dentro del modal de edición
+  mapsButtonModal: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.5)',
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  mapsButtonModalText: {
+    color: '#6ee7b7',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

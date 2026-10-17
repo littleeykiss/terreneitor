@@ -94,6 +94,29 @@ export default function MapView({
 			const styleEl = document.createElement('style');
 			styleEl.id = cssId;
 			styleEl.innerHTML = `
+				/* Reposicionar zoom a la esquina inferior derecha */
+				.leaflet-control-zoom {
+					margin-bottom: 90px !important;
+					margin-right: 12px !important;
+				}
+				.leaflet-control-zoom a {
+					background: rgba(15, 23, 42, 0.92) !important;
+					color: #ffffff !important;
+					border: 1px solid rgba(255,255,255,0.18) !important;
+					font-size: 18px !important;
+					width: 36px !important;
+					height: 36px !important;
+					line-height: 36px !important;
+					border-radius: 8px !important;
+					box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+					transition: background 0.15s ease !important;
+				}
+				.leaflet-control-zoom a:hover {
+					background: rgba(37, 99, 235, 0.85) !important;
+				}
+				.leaflet-control-zoom-in {
+					margin-bottom: 4px !important;
+				}
 				.polygon-label {
 					background: rgba(15, 23, 42, 0.9) !important;
 					border: 1px solid #10b981 !important;
@@ -116,9 +139,12 @@ export default function MapView({
 		if (!containerRef.current || mapInstanceRef.current) return;
 
 		const map = L.map(containerRef.current, {
-			zoomControl: true,
+			zoomControl: false,
 			maxZoom: MAX_ZOOM,
 		}).setView([initialLat, initialLng], DEFAULT_ZOOM);
+
+		// Añadir control de zoom en esquina inferior derecha
+		L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 		// Capa satelital híbrida (Google Hybrid)
 		L.tileLayer(SATELLITE_TILE_URL, {
