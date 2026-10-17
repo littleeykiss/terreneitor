@@ -254,13 +254,8 @@ export default function MapView({
 					const phoneText = poly.phone
 						? `<div style="color:#6ee7b7; font-size:10px; margin-top:1px;">📞 ${poly.phone}</div>`
 						: '';
-					const cLat = poly.coordinates.reduce((s, c) => s + c.latitude, 0) / poly.coordinates.length;
-					const cLng = poly.coordinates.reduce((s, c) => s + c.longitude, 0) / poly.coordinates.length;
-					const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${cLat},${cLng}`;
-					const mapsLink = `<div style="margin-top:4px;"><a href="${mapsUrl}" target="_blank" style="color:#38bdf8; font-size:10px; text-decoration:underline;">🗺️ Cómo llegar</a></div>`;
-
 					polyLayer.bindTooltip(
-						`<div><b>${poly.name}</b>${areaText}${statusBadge}${ownerText}${phoneText}${mapsLink}</div>`,
+						`<div><b>${poly.name}</b>${areaText}${statusBadge}${ownerText}${phoneText}</div>`,
 						{
 							permanent: true,
 							direction: 'center',

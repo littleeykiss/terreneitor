@@ -10,6 +10,8 @@ import {
   Modal,
   ScrollView,
   Keyboard,
+  Image,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import MapView from './src/components/MapView';
@@ -18,6 +20,7 @@ import { searchPlaces, reverseGeocode, PlaceResult } from './src/services/geocod
 import { calculatePolygonArea, calculateCentroid } from './src/utils/geoUtils';
 import { terrainRepository } from './src/repositories/terrainRepository';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { Linking } from 'react-native';
 
 export default function App() {
@@ -49,6 +52,7 @@ export default function App() {
   const [lotNotes, setLotNotes] = useState<string>('');
   const [lotOwner, setLotOwner] = useState<string>('');
   const [lotPhone, setLotPhone] = useState<string>('');
+  const [lotPhotos, setLotPhotos] = useState<string[]>([]);
   const [calculatedArea, setCalculatedArea] = useState<{ areaM2: number; areaHectares: number }>({
     areaM2: 0,
     areaHectares: 0,
@@ -146,6 +150,7 @@ export default function App() {
     setLotAddress('');
     setLotOwner('');
     setLotPhone('');
+    setLotPhotos([]);
     setShowSaveModal(true);
 
     // Dirección sugerida
@@ -166,12 +171,57 @@ export default function App() {
     setLotNotes(terrain.notes || '');
     setLotOwner(terrain.owner || '');
     setLotPhone(terrain.phone || '');
+    setLotPhotos(terrain.photos || []);
     setCalculatedArea({
       areaM2: terrain.areaM2,
       areaHectares: terrain.areaHectares,
     });
     setShowCatalogModal(false);
     setShowSaveModal(true);
+  };
+
+  // Selector y Capturador de Fotos
+  const handlePickImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permiso requerido', 'Se necesita acceso a la galería para agregar fotos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setLotPhotos((prev) => [...prev, result.assets[0].uri]);
+      }
+    } catch (err) {
+      console.warn('Error al seleccionar imagen:', err);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permiso requerido', 'Se necesita acceso a la cámara para tomar fotos.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setLotPhotos((prev) => [...prev, result.assets[0].uri]);
+      }
+    } catch (err) {
+      console.warn('Error al tomar foto:', err);
+    }
+  };
+
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setLotPhotos((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   // Guardar (crear o actualizar)
@@ -191,6 +241,7 @@ export default function App() {
       notes: lotNotes.trim() || undefined,
       owner: lotOwner.trim() || undefined,
       phone: lotPhone.trim() || undefined,
+      photos: lotPhotos.length > 0 ? lotPhotos : undefined,
       coordinates: editingTerrain ? editingTerrain.coordinates : activePoints,
       createdAt: editingTerrain ? editingTerrain.createdAt : Date.now(),
     };
@@ -204,6 +255,7 @@ export default function App() {
     setIsDrawing(false);
     setShowSaveModal(false);
     setEditingTerrain(null);
+    setLotPhotos([]);
   };
 
   const handleDeleteTerrain = async (id: string) => {
@@ -502,6 +554,35 @@ export default function App() {
                 onChangeText={setLotNotes}
               />
 
+              {/* Sección: Fotos del Terreno */}
+              <View style={styles.labelRow}>
+                <Text style={styles.inputLabel}>📷 Fotos del terreno ({lotPhotos.length}):</Text>
+              </View>
+              <View style={styles.photoButtonRow}>
+                <TouchableOpacity style={styles.photoActionButton} onPress={handlePickImage} activeOpacity={0.8}>
+                  <Text style={styles.photoActionButtonText}>🖼️ Galería</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.photoActionButton} onPress={handleTakePhoto} activeOpacity={0.8}>
+                  <Text style={styles.photoActionButtonText}>📸 Cámara</Text>
+                </TouchableOpacity>
+              </View>
+
+              {lotPhotos.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoThumbList}>
+                  {lotPhotos.map((uri, idx) => (
+                    <View key={idx} style={styles.photoThumbWrapper}>
+                      <Image source={{ uri }} style={styles.photoThumb} />
+                      <TouchableOpacity
+                        style={styles.removePhotoButton}
+                        onPress={() => handleRemovePhoto(idx)}
+                      >
+                        <Text style={styles.removePhotoText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+
               {/* Botón: Cómo llegar — visible solo al editar un terreno guardado */}
               {editingTerrain && (
                 <TouchableOpacity
@@ -651,6 +732,15 @@ export default function App() {
                         </Text>
                       )}
 
+                      {/* Miniaturas de fotos en la tarjeta */}
+                      {terrain.photos && terrain.photos.length > 0 && (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catalogPhotoList}>
+                          {terrain.photos.map((uri, idx) => (
+                            <Image key={idx} source={{ uri }} style={styles.catalogPhotoThumb} />
+                          ))}
+                        </ScrollView>
+                      )}
+
                       {/* Acciones */}
                       <View style={styles.terrainItemActions}>
                         <TouchableOpacity
@@ -664,18 +754,7 @@ export default function App() {
                           style={styles.editButton}
                           onPress={() => handleEditTerrain(terrain)}
                         >
-                          <Text style={styles.editButtonText}>✏️ Editar</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.mapsButton}
-                          onPress={() => {
-                            const centroid = calculateCentroid(terrain.coordinates);
-                            const url = `https://www.google.com/maps/search/?api=1&query=${centroid.latitude},${centroid.longitude}`;
-                            Linking.openURL(url);
-                          }}
-                        >
-                          <Text style={styles.mapsButtonText}>🗺️ Cómo llegar</Text>
+                          <Text style={styles.editButtonText}>✏️ Editar / Ficha</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -1277,5 +1356,66 @@ const styles = StyleSheet.create({
     color: '#6ee7b7',
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Sección de fotos
+  photoButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  photoActionButton: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  photoActionButtonText: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  photoThumbList: {
+    marginBottom: 14,
+  },
+  photoThumbWrapper: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  photoThumb: {
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removePhotoText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  catalogPhotoList: {
+    marginVertical: 8,
+  },
+  catalogPhotoThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 6,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#475569',
   },
 });

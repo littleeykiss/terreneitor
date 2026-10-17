@@ -29,5 +29,6 @@ export interface TerrainPolygon {
   createdAt: number;         // Fecha de registro
   owner?: string;            // Dueño del terreno
   phone?: string;            // Teléfono de contacto
+  photos?: string[];         // Fotos del terreno (URIs o Base64)
 }
 
