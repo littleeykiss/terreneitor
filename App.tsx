@@ -66,7 +66,22 @@ export default function App() {
     terrainRepository.getAll().then((loaded) => {
       setPolygons(loaded);
     });
-  }, []);
+	}, []);
+
+	// Solicitar permisos de geolocalización y obtener posición inicial
+	useEffect(() => {
+		const requestLocation = async () => {
+			const { status } = await Location.requestForegroundPermissionsAsync();
+			if (status !== 'granted') {
+				console.warn('Permiso de ubicación denegado');
+				return;
+			}
+			const location = await Location.getCurrentPositionAsync({});
+			const { latitude, longitude } = location.coords;
+			setCenterCoordinate({ latitude, longitude });
+		};
+		requestLocation();
+	}, []);
 
   // ==========================================
   // CONTROLADORES DE BÚSQUEDA
