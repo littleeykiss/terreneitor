@@ -27,4 +27,7 @@ export interface TerrainPolygon {
   coordinates: Coordinate[]; // Vértices geográficos
   color?: string;            // Color asociado al estado
   createdAt: number;         // Fecha de registro
+  owner?: string;            // Dueño del terreno
+  phone?: string;            // Teléfono de contacto
 }
+
