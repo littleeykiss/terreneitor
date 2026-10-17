@@ -1,22 +1,25 @@
 import React from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
+import { Coordinate, TerrainPolygon } from '../types';
 
 export interface MapRegion {
   latitude: number;
   longitude: number;
-  latitudeDelta?: number;
-  longitudeDelta?: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
 }
 
 export interface MapViewProps {
   style?: StyleProp<ViewStyle>;
   initialRegion?: MapRegion;
+  centerCoordinate?: Coordinate | null;
   mapType?: 'standard' | 'satellite' | 'hybrid';
+  onMapPress?: (coord: Coordinate) => void;
+  activePoints?: Coordinate[];
+  polygons?: TerrainPolygon[];
   children?: React.ReactNode;
 }
 
-// En tiempo de ejecución Metro usa `MapView.web.tsx` o `MapView.native.tsx`.
-// Este archivo sirve como interfaz base para TypeScript.
 export default function MapView(_props: MapViewProps): React.JSX.Element | null {
   return null;
 }

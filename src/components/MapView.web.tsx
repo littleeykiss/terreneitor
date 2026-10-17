@@ -1,31 +1,50 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import L from 'leaflet';
+import { Coordinate, TerrainPolygon } from '../types';
 
 export interface MapRegion {
   latitude: number;
   longitude: number;
-  latitudeDelta?: number;
-  longitudeDelta?: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
 }
 
 export interface MapViewProps {
   style?: StyleProp<ViewStyle>;
   initialRegion?: MapRegion;
+  centerCoordinate?: Coordinate | null;
   mapType?: 'standard' | 'satellite' | 'hybrid';
+  onMapPress?: (coord: Coordinate) => void;
+  activePoints?: Coordinate[];
+  polygons?: TerrainPolygon[];
   children?: React.ReactNode;
 }
 
-/**
- * Componente de mapa para WEB:
- * Usa Leaflet con las imágenes satelitales de alta resolución de Esri World Imagery (gratuito).
- */
-export default function MapView({ style, initialRegion, children }: MapViewProps) {
+export default function MapView({
+  style,
+  initialRegion,
+  centerCoordinate,
+  onMapPress,
+  activePoints = [],
+  polygons = [],
+  children,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
 
+  // Guardamos las capas de Leaflet en refs para manipularlas sin reconstruir el mapa:
+  const drawLayerRef = useRef<L.LayerGroup | null>(null);
+  const polygonLayerRef = useRef<L.LayerGroup | null>(null);
+
+  // Mantenemos una referencia al callback actual para evitar cierres obsoletos (stale closures):
+  const onMapPressRef = useRef(onMapPress);
   useEffect(() => {
-    // Inyectar CSS de Leaflet si no está presente
+    onMapPressRef.current = onMapPress;
+  }, [onMapPress]);
+
+  // Inicialización del mapa (solo corre una vez al montar):
+  useEffect(() => {
     const cssId = 'leaflet-css';
     if (!document.getElementById(cssId)) {
       const link = document.createElement('link');
@@ -40,9 +59,11 @@ export default function MapView({ style, initialRegion, children }: MapViewProps
     const lat = initialRegion?.latitude ?? 20.659698;
     const lng = initialRegion?.longitude ?? -103.349609;
 
-    const map = L.map(containerRef.current).setView([lat, lng], 15);
+    const map = L.map(containerRef.current, {
+      zoomControl: true,
+    }).setView([lat, lng], 15);
 
-    // Esri World Imagery (Vista satelital de alta resolución, gratuita)
+    // Esri World Imagery (satelital gratis)
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       {
@@ -51,9 +72,22 @@ export default function MapView({ style, initialRegion, children }: MapViewProps
       }
     ).addTo(map);
 
+    // Capas para dibujo y polígonos guardados
+    drawLayerRef.current = L.layerGroup().addTo(map);
+    polygonLayerRef.current = L.layerGroup().addTo(map);
+
+    // Listener de clic en el mapa:
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      if (onMapPressRef.current) {
+        onMapPressRef.current({
+          latitude: e.latlng.lat,
+          longitude: e.latlng.lng,
+        });
+      }
+    });
+
     mapInstanceRef.current = map;
 
-    // Invalidate size en caso de que tarde un tick en tener dimensiones finales
     setTimeout(() => {
       map.invalidateSize();
     }, 150);
@@ -69,6 +103,71 @@ export default function MapView({ style, initialRegion, children }: MapViewProps
       mapInstanceRef.current = null;
     };
   }, []);
+
+  // Efecto reactivo: Redibuja los puntos y líneas en proceso de dibujo
+  useEffect(() => {
+    if (!drawLayerRef.current) return;
+    drawLayerRef.current.clearLayers();
+
+    if (activePoints.length === 0) return;
+
+    const latLngs: L.LatLngTuple[] = activePoints.map((pt) => [
+      pt.latitude,
+      pt.longitude,
+    ]);
+
+    // Dibuja la línea que conecta los puntos
+    if (latLngs.length > 1) {
+      L.polyline(latLngs, {
+        color: '#38bdf8',
+        weight: 3,
+        dashArray: '6, 6',
+      }).addTo(drawLayerRef.current);
+    }
+
+    // Dibuja un marcador circular en cada vértice marcado
+    latLngs.forEach(([lat, lng], index) => {
+      L.circleMarker([lat, lng], {
+        radius: 6,
+        color: '#0284c7',
+        fillColor: index === 0 ? '#22c55e' : '#ffffff', // El primer punto en verde
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(drawLayerRef.current!);
+    });
+  }, [activePoints]);
+
+  // Efecto reactivo: Redibuja los polígonos ya terminados
+  useEffect(() => {
+    if (!polygonLayerRef.current) return;
+    polygonLayerRef.current.clearLayers();
+
+    polygons.forEach((poly) => {
+      const latLngs: L.LatLngTuple[] = poly.coordinates.map((pt) => [
+        pt.latitude,
+        pt.longitude,
+      ]);
+
+      if (latLngs.length >= 3) {
+        L.polygon(latLngs, {
+          color: poly.color || '#10b981',
+          fillColor: poly.color || '#10b981',
+          fillOpacity: 0.35,
+          weight: 3,
+        }).addTo(polygonLayerRef.current!);
+      }
+    });
+  }, [polygons]);
+
+  // Efecto reactivo: Mueve la cámara suavemente al centro buscado
+  useEffect(() => {
+    if (!mapInstanceRef.current || !centerCoordinate) return;
+    mapInstanceRef.current.flyTo(
+      [centerCoordinate.latitude, centerCoordinate.longitude],
+      16,
+      { duration: 1.5 }
+    );
+  }, [centerCoordinate]);
 
   return (
     <View style={[styles.container, style]}>
