@@ -17,6 +17,8 @@ import { Coordinate, TerrainPolygon, TerrainStatus } from './src/types';
 import { searchPlaces, reverseGeocode, PlaceResult } from './src/services/geocoding';
 import { calculatePolygonArea, calculateCentroid } from './src/utils/geoUtils';
 import { terrainRepository } from './src/repositories/terrainRepository';
+import * as Location from 'expo-location';
+import { Linking } from 'react-native';
 
 export default function App() {
   // ==========================================
