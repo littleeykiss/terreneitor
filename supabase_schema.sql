@@ -12,6 +12,7 @@ create table if not exists public.terrains (
   area_hectares numeric not null,
   price numeric,
   status text not null default 'disponible' check (status in ('disponible', 'apartado', 'vendido')),
+  land_type text check (land_type in ('rustico', 'urbano', 'comercial', 'habitacional', 'mixto')),
   notes text,
   owner text,
   phone text,

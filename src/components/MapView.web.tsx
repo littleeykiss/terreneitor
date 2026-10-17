@@ -118,16 +118,18 @@ export default function MapView({
 					margin-bottom: 4px !important;
 				}
 				.polygon-label {
-					background: rgba(15, 23, 42, 0.9) !important;
-					border: 1px solid #10b981 !important;
+					background: rgba(15, 23, 42, 0.92) !important;
+					border: 1px solid rgba(56, 189, 248, 0.6) !important;
 					color: #ffffff !important;
 					font-weight: 600 !important;
 					font-size: 11px !important;
-					padding: 3px 8px !important;
-					border-radius: 6px !important;
-					box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
+					padding: 6px 8px !important;
+					border-radius: 8px !important;
+					box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
 					text-align: center !important;
-					white-space: nowrap !important;
+					white-space: normal !important;
+					max-width: 140px !important;
+					backdrop-filter: blur(4px) !important;
 				}
 				.polygon-label::before {
 					display: none !important;
@@ -243,19 +245,53 @@ export default function MapView({
 				// Etiqueta flotante permanente sobre el polígono
 				if (poly.name) {
 					const areaText = poly.areaM2
-						? `<div style="color: #38bdf8; font-size: 10px;">${poly.areaM2.toLocaleString('es-MX', { maximumFractionDigits: 1 })} m²</div>`
+						? `<div style="color: #38bdf8; font-size: 10px; font-weight: 500;">${poly.areaM2.toLocaleString('es-MX', { maximumFractionDigits: 1 })} m²</div>`
 						: '';
+
 					const statusBadge = poly.status
-						? `<div style="margin-top:2px;"><span style="font-size:9px; padding:1px 5px; border-radius:4px; background:${color}; color:#fff; text-transform:uppercase;">${poly.status}</span></div>`
+						? `<span style="font-size:9px; padding:2px 6px; border-radius:4px; background:${color}; color:#fff; font-weight:700; text-transform:uppercase;">${poly.status}</span>`
 						: '';
+
+					const landTypeLabels: Record<string, string> = {
+						rustico: '🌾 Rústico',
+						urbano: '🏙️ Urbano',
+						comercial: '🏢 Comercial',
+						habitacional: '🏡 Habitacional',
+						mixto: '🔄 Mixto',
+					};
+
+					const landTypeBadge = poly.landType
+						? `<span style="font-size:9px; padding:2px 6px; border-radius:4px; background:rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.5); color:#38bdf8; font-weight:600;">${landTypeLabels[poly.landType] || poly.landType}</span>`
+						: '';
+
+					const badgesRow = (statusBadge || landTypeBadge)
+						? `<div style="display:flex; gap:4px; justify-content:center; align-items:center; margin-top:3px; flex-wrap:wrap;">${statusBadge}${landTypeBadge}</div>`
+						: '';
+
+					// Miniatura de la primera foto del terreno (si tiene fotos)
+					const photoThumb = (poly.photos && poly.photos.length > 0)
+						? `<div style="margin-bottom:4px; position:relative; width:84px; height:54px; margin-left:auto; margin-right:auto;">
+								<img src="${poly.photos[0]}" style="width:100%; height:100%; object-fit:cover; border-radius:4px; border:1px solid rgba(255,255,255,0.3); display:block;" onerror="this.style.display='none'" />
+								${poly.photos.length > 1 ? `<span style="position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.7); color:#fff; font-size:8px; padding:1px 3px; border-radius:3px;">+${poly.photos.length - 1} 📷</span>` : ''}
+						   </div>`
+						: '';
+
 					const ownerText = poly.owner
 						? `<div style="color:#e2e8f0; font-size:10px; margin-top:3px;">👤 ${poly.owner}</div>`
 						: '';
 					const phoneText = poly.phone
 						? `<div style="color:#6ee7b7; font-size:10px; margin-top:1px;">📞 ${poly.phone}</div>`
 						: '';
+
 					polyLayer.bindTooltip(
-						`<div><b>${poly.name}</b>${areaText}${statusBadge}${ownerText}${phoneText}</div>`,
+						`<div style="text-align:center;">
+							${photoThumb}
+							<b style="font-size:11px; color:#ffffff;">${poly.name}</b>
+							${areaText}
+							${badgesRow}
+							${ownerText}
+							${phoneText}
+						</div>`,
 						{
 							permanent: true,
 							direction: 'center',

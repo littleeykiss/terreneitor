@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import MapView from './src/components/MapView';
-import { Coordinate, TerrainPolygon, TerrainStatus } from './src/types';
+import { Coordinate, TerrainPolygon, TerrainStatus, TerrainLandType } from './src/types';
 import { searchPlaces, reverseGeocode, PlaceResult } from './src/services/geocoding';
 import { calculatePolygonArea, calculateCentroid } from './src/utils/geoUtils';
 import { terrainRepository } from './src/repositories/terrainRepository';
@@ -49,6 +49,7 @@ export default function App() {
   const [lotAddress, setLotAddress] = useState<string>('');
   const [lotPrice, setLotPrice] = useState<string>('');
   const [lotStatus, setLotStatus] = useState<TerrainStatus>('disponible');
+  const [lotLandType, setLotLandType] = useState<TerrainLandType>('urbano');
   const [lotNotes, setLotNotes] = useState<string>('');
   const [lotOwner, setLotOwner] = useState<string>('');
   const [lotPhone, setLotPhone] = useState<string>('');
@@ -64,6 +65,12 @@ export default function App() {
   // ==========================================
   const [showCatalogModal, setShowCatalogModal] = useState<boolean>(false);
   const [filterStatus, setFilterStatus] = useState<string>('todos');
+  const [filterLandType, setFilterLandType] = useState<string>('todos');
+
+  // ==========================================
+  // MODAL 3: VISOR DE FOTO A PANTALLA COMPLETA
+  // ==========================================
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
   // ==========================================
   // CARGA INICIAL
@@ -146,6 +153,7 @@ export default function App() {
     setLotName(`Terreno #${defaultLotNumber}`);
     setLotPrice('');
     setLotStatus('disponible');
+    setLotLandType('urbano');
     setLotNotes('');
     setLotAddress('');
     setLotOwner('');
@@ -168,6 +176,7 @@ export default function App() {
     setLotAddress(terrain.address || '');
     setLotPrice(terrain.price ? terrain.price.toString() : '');
     setLotStatus(terrain.status || 'disponible');
+    setLotLandType(terrain.landType || 'urbano');
     setLotNotes(terrain.notes || '');
     setLotOwner(terrain.owner || '');
     setLotPhone(terrain.phone || '');
@@ -238,6 +247,7 @@ export default function App() {
       areaHectares: calculatedArea.areaHectares,
       price: parsedPrice && !isNaN(parsedPrice) ? parsedPrice : undefined,
       status: lotStatus,
+      landType: lotLandType,
       notes: lotNotes.trim() || undefined,
       owner: lotOwner.trim() || undefined,
       phone: lotPhone.trim() || undefined,
@@ -269,10 +279,12 @@ export default function App() {
     setShowCatalogModal(false);
   };
 
-  // Filtrado en la bodega
-  const filteredPolygons = filterStatus === 'todos'
-    ? polygons
-    : polygons.filter((p) => p.status === filterStatus);
+  // Filtrado en la bodega (por estado y por tipo de suelo)
+  const filteredPolygons = polygons.filter((p) => {
+    const matchStatus = filterStatus === 'todos' || p.status === filterStatus;
+    const matchLandType = filterLandType === 'todos' || p.landType === filterLandType;
+    return matchStatus && matchLandType;
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -486,6 +498,41 @@ export default function App() {
                 })}
               </View>
 
+              {/* Catálogo de Clasificación / Uso de Suelo */}
+              <Text style={styles.inputLabel}>Tipo de Terreno (Uso de Suelo):</Text>
+              <View style={styles.landTypeSelector}>
+                {(
+                  [
+                    { key: 'rustico', label: '🌾 Rústico' },
+                    { key: 'urbano', label: '🏙️ Urbano' },
+                    { key: 'comercial', label: '🏢 Comercial' },
+                    { key: 'habitacional', label: '🏡 Habitacional' },
+                    { key: 'mixto', label: '🔄 Mixto' },
+                  ] as { key: TerrainLandType; label: string }[]
+                ).map((lt) => {
+                  const isActive = lotLandType === lt.key;
+                  return (
+                    <TouchableOpacity
+                      key={lt.key}
+                      style={[
+                        styles.landTypeOption,
+                        isActive && styles.landTypeOptionActive,
+                      ]}
+                      onPress={() => setLotLandType(lt.key)}
+                    >
+                      <Text
+                        style={[
+                          styles.landTypeOptionText,
+                          isActive && styles.landTypeOptionTextActive,
+                        ]}
+                      >
+                        {lt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               {/* Campo: Nombre / Etiqueta */}
               <Text style={styles.inputLabel}>Nombre o Etiqueta:</Text>
               <TextInput
@@ -644,35 +691,71 @@ export default function App() {
               </TouchableOpacity>
             </View>
 
-            {/* Filtros por estado */}
-            <View style={styles.filterRow}>
-              {['todos', 'disponible', 'apartado', 'vendido'].map((f) => (
-                <TouchableOpacity
-                  key={f}
-                  style={[
-                    styles.filterChip,
-                    filterStatus === f && styles.filterChipActive,
-                  ]}
-                  onPress={() => setFilterStatus(f)}
-                >
-                  <Text
+            {/* Filtros por estado comercial */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionLabel}>Estado:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                {['todos', 'disponible', 'apartado', 'vendido'].map((f) => (
+                  <TouchableOpacity
+                    key={f}
                     style={[
-                      styles.filterChipText,
-                      filterStatus === f && styles.filterChipTextActive,
+                      styles.filterChip,
+                      filterStatus === f && styles.filterChipActive,
                     ]}
+                    onPress={() => setFilterStatus(f)}
                   >
-                    {f.charAt(0).toUpperCase() + f.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        filterStatus === f && styles.filterChipTextActive,
+                      ]}
+                    >
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Filtros por tipo de terreno / uso de suelo */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionLabel}>Uso:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                {[
+                  { key: 'todos', label: 'Todos' },
+                  { key: 'rustico', label: '🌾 Rústico' },
+                  { key: 'urbano', label: '🏙️ Urbano' },
+                  { key: 'comercial', label: '🏢 Comercial' },
+                  { key: 'habitacional', label: '🏡 Habitacional' },
+                  { key: 'mixto', label: '🔄 Mixto' },
+                ].map((lt) => (
+                  <TouchableOpacity
+                    key={lt.key}
+                    style={[
+                      styles.filterChip,
+                      filterLandType === lt.key && styles.filterChipActiveLand,
+                    ]}
+                    onPress={() => setFilterLandType(lt.key)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        filterLandType === lt.key && styles.filterChipTextActive,
+                      ]}
+                    >
+                      {lt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
 
             {filteredPolygons.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>🏞️</Text>
-                <Text style={styles.emptyTitle}>No hay terrenos en esta categoría</Text>
+                <Text style={styles.emptyTitle}>No hay terrenos con estos filtros</Text>
                 <Text style={styles.emptySubtitle}>
-                  Usa "Dibujar terreno" en el mapa para registrar nuevos lotes.
+                  Prueba cambiando los filtros de estado o tipo de terreno, o dibuja uno nuevo.
                 </Text>
               </View>
             ) : (
@@ -685,14 +768,31 @@ export default function App() {
                   };
                   const color = statusColors[terrain.status] || '#10b981';
 
+                  const landTypeLabels: Record<string, string> = {
+                    rustico: '🌾 Rústico',
+                    urbano: '🏙️ Urbano',
+                    comercial: '🏢 Comercial',
+                    habitacional: '🏡 Habitacional',
+                    mixto: '🔄 Mixto',
+                  };
+
                   return (
                     <View key={terrain.id} style={styles.terrainItem}>
                       <View style={styles.terrainItemHeader}>
                         <Text style={styles.terrainItemName}>{terrain.name}</Text>
-                        <View style={[styles.statusBadge, { borderColor: color, backgroundColor: `${color}22` }]}>
-                          <Text style={[styles.statusBadgeText, { color }]}>
-                            {(terrain.status || 'disponible').toUpperCase()}
-                          </Text>
+                        <View style={styles.badgeRow}>
+                          {terrain.landType && (
+                            <View style={styles.landTypeBadge}>
+                              <Text style={styles.landTypeBadgeText}>
+                                {landTypeLabels[terrain.landType] || terrain.landType}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={[styles.statusBadge, { borderColor: color, backgroundColor: `${color}22` }]}>
+                            <Text style={[styles.statusBadgeText, { color }]}>
+                              {(terrain.status || 'disponible').toUpperCase()}
+                            </Text>
+                          </View>
                         </View>
                       </View>
 
@@ -732,13 +832,22 @@ export default function App() {
                         </Text>
                       )}
 
-                      {/* Miniaturas de fotos en la tarjeta */}
+                      {/* Miniaturas de fotos en la tarjeta - Toca para ver en grande */}
                       {terrain.photos && terrain.photos.length > 0 && (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catalogPhotoList}>
-                          {terrain.photos.map((uri, idx) => (
-                            <Image key={idx} source={{ uri }} style={styles.catalogPhotoThumb} />
-                          ))}
-                        </ScrollView>
+                        <View style={styles.photoContainer}>
+                          <Text style={styles.photoSectionTitle}>📷 Fotos asociadas ({terrain.photos.length}) — Toca para ampliar:</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catalogPhotoList}>
+                            {terrain.photos.map((uri, idx) => (
+                              <TouchableOpacity
+                                key={idx}
+                                activeOpacity={0.8}
+                                onPress={() => setFullScreenImage(uri)}
+                              >
+                                <Image source={{ uri }} style={styles.catalogPhotoThumb} />
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        </View>
                       )}
 
                       {/* Acciones */}
@@ -770,6 +879,33 @@ export default function App() {
               </ScrollView>
             )}
           </View>
+        </View>
+      </Modal>
+
+      {/* =================================================== */}
+      {/* MODAL 3: VISOR DE FOTO A PANTALLA COMPLETA         */}
+      {/* =================================================== */}
+      <Modal
+        visible={!!fullScreenImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setFullScreenImage(null)}
+      >
+        <View style={styles.fullScreenOverlay}>
+          <TouchableOpacity
+            style={styles.closeFullScreenBtn}
+            onPress={() => setFullScreenImage(null)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.closeFullScreenText}>✕ Cerrar</Text>
+          </TouchableOpacity>
+          {fullScreenImage && (
+            <Image
+              source={{ uri: fullScreenImage }}
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+            />
+          )}
         </View>
       </Modal>
 
@@ -1417,5 +1553,110 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderWidth: 1,
     borderColor: '#475569',
+  },
+  // ==========================================
+  // CATÁLOGO DE USO DE SUELO / TIPO DE TERRENO
+  // ==========================================
+  landTypeSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  landTypeOption: {
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  landTypeOptionActive: {
+    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+    borderColor: '#38bdf8',
+  },
+  landTypeOptionText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  landTypeOptionTextActive: {
+    color: '#38bdf8',
+    fontWeight: 'bold',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  landTypeBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+  },
+  landTypeBadgeText: {
+    color: '#38bdf8',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  filterSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  filterSectionLabel: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: 'bold',
+    width: 48,
+  },
+  filterScroll: {
+    flexGrow: 0,
+  },
+  filterChipActiveLand: {
+    backgroundColor: '#0284c7',
+    borderColor: '#38bdf8',
+  },
+  photoContainer: {
+    marginVertical: 6,
+  },
+  photoSectionTitle: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  // ==========================================
+  // VISOR A PANTALLA COMPLETA
+  // ==========================================
+  fullScreenOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  closeFullScreenBtn: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 9999,
+  },
+  closeFullScreenText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '80%',
   },
 });

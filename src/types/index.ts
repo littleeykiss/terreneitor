@@ -13,6 +13,11 @@ export interface Coordinate {
 export type TerrainStatus = 'disponible' | 'apartado' | 'vendido';
 
 /**
+ * Catálogo de clasificación o uso de suelo del terreno
+ */
+export type TerrainLandType = 'rustico' | 'urbano' | 'comercial' | 'habitacional' | 'mixto';
+
+/**
  * Entidad completa de Terreno (similar a @Entity public class Terrain { ... } en JPA)
  */
 export interface TerrainPolygon {
@@ -23,6 +28,7 @@ export interface TerrainPolygon {
   areaHectares: number;      // Área en hectáreas
   price?: number;            // Precio en MXN (opcional)
   status: TerrainStatus;     // Estado: disponible, apartado o vendido
+  landType?: TerrainLandType;// Clasificación: rústico, urbano, comercial, habitacional, mixto
   notes?: string;            // Notas o descripción rápida
   coordinates: Coordinate[]; // Vértices geográficos
   color?: string;            // Color asociado al estado

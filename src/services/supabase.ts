@@ -3,9 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 declare const process: any;
 
-// REEMPLAZA ESTOS VALORES CON LOS DE TU PROYECTO DE SUPABASE (Settings -> API)
-export const SUPABASE_URL = (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_URL) || 'https://slvhhjraacroxidbkdfc.supabase.co';
-export const SUPABASE_ANON_KEY = (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_ANON_KEY) || 'sb_publishable_6vNWmE7Rs3wX2u8CYOdoAw_U_gR5Pfm';
+// Las credenciales se leen desde el archivo .env (nunca las pongas en el código)
+// Copia .env.example -> .env y rellena tus valores reales
+export const SUPABASE_URL: string = (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_URL) || '';
+export const SUPABASE_ANON_KEY: string = (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_ANON_KEY) || '';
 
 export const isSupabaseConfigured = () => {
 	return (
