@@ -28,12 +28,13 @@
     "eslint-config-expo": "~58.0.4",
     "typescript": "~6.0.3"
   },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "lint": "expo lint"
-  },
+	"scripts": {
+		"start": "expo start",
+		"android": "expo start --android",
+		"ios": "expo start --ios",
+		"web": "expo start --web",
+		"build": "expo export -p web",
+		"lint": "expo lint"
+	},
   "private": true
 }
