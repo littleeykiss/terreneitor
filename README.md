@@ -1,4 +1,4 @@
-﻿# 🗺️ Terreneitor
+# 🗺️ Terreneitor
 
 > Aplicación móvil y web para la **gestión, catalogación y visualización de terrenos** sobre mapa satelital. Dibuja polígonos, registra fichas, organiza tu inventario y navega a cualquier lote con Google Maps.
 
@@ -15,6 +15,8 @@
 | 🌐 **Geocodificación inversa** | Detecta la dirección automáticamente al guardar |
 | 🔍 **Buscador de lugares** | Busca ciudades, colonias o puntos de interés y centra el mapa |
 | 📁 **Bodega / Catálogo** | Lista paginada con filtros por estado comercial |
+| 📷 **Fotos y Cámara** | Toma fotos o sube desde la galería para documentar cada terreno |
+| ☁️ **Sincronización Supabase** | Soporte para sincronizar datos en la nube con persistencia offline |
 | 🟢🟡🔴 **Estados comerciales** | Disponible / Apartado / Vendido con colores en mapa y catálogo |
 | 🗺️ **Cómo llegar** | Abre Google Maps centrado en el polígono desde el modal de edición |
 | 💾 **Persistencia local** | Todos los terrenos se guardan con AsyncStorage (sin cuenta ni servidor) |
@@ -30,6 +32,8 @@
 - **react-native-maps** — Mapas nativos para iOS/Android
 - **@turf/area + @turf/helpers** — Cálculo geoespacial de áreas
 - **@react-native-async-storage/async-storage** — Persistencia local
+- **expo-image-picker** — Cámara y selección de fotos
+- **@supabase/supabase-js** — Conexión y sincronización en la nube con Supabase
 - **expo-location** — Acceso a GPS del dispositivo
 - **TypeScript** — Tipado estático en todo el proyecto
 
