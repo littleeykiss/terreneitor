@@ -541,7 +541,7 @@ export default function App() {
                         <Text style={styles.terrainItemName}>{terrain.name}</Text>
                         <View style={[styles.statusBadge, { borderColor: color, backgroundColor: `${color}22` }]}>
                           <Text style={[styles.statusBadgeText, { color }]}>
-                            {terrain.status.toUpperCase()}
+                            {(terrain.status || 'disponible').toUpperCase()}
                           </Text>
                         </View>
                       </View>
