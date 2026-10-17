@@ -19,6 +19,7 @@ export interface MapViewProps extends Omit<RNMapViewProps, 'onPress'> {
 	centerCoordinate?: Coordinate | null;
 	onMapPress?: (coord: Coordinate) => void;
 	onPolygonPress?: (polygon: TerrainPolygon) => void;
+	onPhotoPress?: (photoUri: string) => void;
 	activePoints?: Coordinate[];
 	polygons?: TerrainPolygon[];
 	children?: React.ReactNode;

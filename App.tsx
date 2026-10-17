@@ -31,6 +31,7 @@ export default function App() {
   const [activePoints, setActivePoints] = useState<Coordinate[]>([]);
   const [polygons, setPolygons] = useState<TerrainPolygon[]>([]);
   const [centerCoordinate, setCenterCoordinate] = useState<Coordinate | null>(null);
+  const [mapLayer, setMapLayer] = useState<'satellite' | 'relief'>('satellite');
 
   // ==========================================
   // ESTADOS DEL BUSCADOR
@@ -189,7 +190,7 @@ export default function App() {
     setShowSaveModal(true);
   };
 
-  // Selector y Capturador de Fotos
+  // Selector y Capturador de Fotos (convertidas a data URL Base64 para persistencia en Supabase / LocalStorage)
   const handlePickImage = async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -200,10 +201,16 @@ export default function App() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 0.7,
+        quality: 0.6,
+        base64: true,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setLotPhotos((prev) => [...prev, result.assets[0].uri]);
+        const asset = result.assets[0];
+        // En web o móvil, si viene base64 se guarda como data URI para que persista para siempre
+        const photoData = asset.base64
+          ? `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`
+          : asset.uri;
+        setLotPhotos((prev) => [...prev, photoData]);
       }
     } catch (err) {
       console.warn('Error al seleccionar imagen:', err);
@@ -219,10 +226,15 @@ export default function App() {
       }
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
-        quality: 0.7,
+        quality: 0.6,
+        base64: true,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setLotPhotos((prev) => [...prev, result.assets[0].uri]);
+        const asset = result.assets[0];
+        const photoData = asset.base64
+          ? `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`
+          : asset.uri;
+        setLotPhotos((prev) => [...prev, photoData]);
       }
     } catch (err) {
       console.warn('Error al tomar foto:', err);
@@ -291,7 +303,7 @@ export default function App() {
       {/* MAPA PRINCIPAL */}
       <MapView
         style={styles.map}
-        mapType="satellite"
+        mapType={mapLayer}
         initialRegion={{
           latitude: 20.659698,
           longitude: -103.349609,
@@ -308,7 +320,7 @@ export default function App() {
       />
 
       {/* =================================================== */}
-      {/* BARRA SUPERIOR: BUSCADOR + BOTÓN BODEGA             */}
+      {/* BARRA SUPERIOR: BUSCADOR + TOGGLE CAPAS + BODEGA    */}
       {/* =================================================== */}
       <View style={styles.topContainer}>
         <View style={styles.searchRow}>
@@ -375,6 +387,20 @@ export default function App() {
           </View>
         )}
       </View>
+
+      {/* =================================================== */}
+      {/* BOTÓN FLOTANTE: RELIEVE / SATÉLITE                  */}
+      {/* Esquina inferior derecha, debajo de controles zoom  */}
+      {/* =================================================== */}
+      <TouchableOpacity
+        style={styles.floatingLayerBtn}
+        onPress={() => setMapLayer((prev) => (prev === 'satellite' ? 'relief' : 'satellite'))}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.floatingLayerBtnText}>
+          {mapLayer === 'satellite' ? '⛰️ Relieve' : '🛰️ Satélite'}
+        </Text>
+      </TouchableOpacity>
 
       {/* =================================================== */}
       {/* PANEL INFERIOR: CONTROLES DE DIBUJO                */}
@@ -457,6 +483,35 @@ export default function App() {
               keyboardShouldPersistTaps="handled"
               style={styles.modalScroll}
             >
+              {/* Carrusel de Fotos al Inicio de la Ficha / Modal */}
+              {lotPhotos.length > 0 && (
+                <View style={styles.carouselSection}>
+                  <Text style={styles.carouselHeaderTitle}>
+                    📸 Galería del Terreno ({lotPhotos.length} fotos) — Toca para ampliar:
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.carouselScrollView}
+                  >
+                    {lotPhotos.map((uri, idx) => (
+                      <View key={idx} style={styles.carouselSlide}>
+                        <TouchableOpacity
+                          activeOpacity={0.9}
+                          onPress={() => setFullScreenImage(uri)}
+                        >
+                          <Image source={{ uri }} style={styles.carouselImage} />
+                          <View style={styles.carouselBadge}>
+                            <Text style={styles.carouselBadgeText}>🔍 {idx + 1}/{lotPhotos.length}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
               {/* Ficha de área calculada */}
               <View style={styles.areaBadge}>
                 <Text style={styles.areaBadgeTitle}>Área calculada:</Text>
@@ -543,15 +598,24 @@ export default function App() {
                 onChangeText={setLotName}
               />
 
-              {/* Campo: Precio */}
-              <Text style={styles.inputLabel}>Precio en MXN (opcional):</Text>
+              {/* Campo: Precio (Solo dígitos numéricos y punto decimal) */}
+              <Text style={styles.inputLabel}>Precio en MXN (solo números):</Text>
               <TextInput
                 style={styles.modalInput}
                 placeholder="Ej. 1250000"
                 placeholderTextColor="#64748b"
                 keyboardType="numeric"
                 value={lotPrice}
-                onChangeText={setLotPrice}
+                onChangeText={(text) => {
+                  // Validación estricta: solo números y un único punto decimal
+                  const sanitized = text.replace(/[^0-9.]/g, '');
+                  const parts = sanitized.split('.');
+                  if (parts.length > 2) {
+                    setLotPrice(`${parts[0]}.${parts.slice(1).join('')}`);
+                  } else {
+                    setLotPrice(sanitized);
+                  }
+                }}
               />
 
               {/* Campo: Dirección */}
@@ -580,15 +644,20 @@ export default function App() {
                 onChangeText={setLotOwner}
               />
 
-              {/* Campo: Teléfono */}
-              <Text style={styles.inputLabel}>Teléfono de contacto (opcional):</Text>
+              {/* Campo: Teléfono (Solo números, máximo 10-15 dígitos) */}
+              <Text style={styles.inputLabel}>Teléfono de contacto (solo números):</Text>
               <TextInput
                 style={styles.modalInput}
                 placeholder="Ej. 3312345678"
                 placeholderTextColor="#64748b"
                 keyboardType="phone-pad"
+                maxLength={15}
                 value={lotPhone}
-                onChangeText={setLotPhone}
+                onChangeText={(text) => {
+                  // Validación estricta: solo números
+                  const sanitized = text.replace(/[^0-9]/g, '');
+                  setLotPhone(sanitized);
+                }}
               />
 
               {/* Campo: Notas */}
@@ -603,7 +672,7 @@ export default function App() {
 
               {/* Sección: Fotos del Terreno */}
               <View style={styles.labelRow}>
-                <Text style={styles.inputLabel}>📷 Fotos del terreno ({lotPhotos.length}):</Text>
+                <Text style={styles.inputLabel}>📷 Agregar / Gestionar fotos ({lotPhotos.length}):</Text>
               </View>
               <View style={styles.photoButtonRow}>
                 <TouchableOpacity style={styles.photoActionButton} onPress={handlePickImage} activeOpacity={0.8}>
@@ -618,7 +687,9 @@ export default function App() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoThumbList}>
                   {lotPhotos.map((uri, idx) => (
                     <View key={idx} style={styles.photoThumbWrapper}>
-                      <Image source={{ uri }} style={styles.photoThumb} />
+                      <TouchableOpacity activeOpacity={0.8} onPress={() => setFullScreenImage(uri)}>
+                        <Image source={{ uri }} style={styles.photoThumb} />
+                      </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.removePhotoButton}
                         onPress={() => handleRemovePhoto(idx)}
@@ -988,10 +1059,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  floatingLayerBtn: {
+    position: 'absolute',
+    bottom: 24,
+    right: 12,
+    zIndex: 2500,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.5)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 20,
+    cursor: 'pointer',
+  } as any,
+  floatingLayerBtnText: {
+    color: '#38bdf8',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
   catalogButton: {
     backgroundColor: 'rgba(15, 23, 42, 0.95)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 25,
     borderWidth: 1,
     borderColor: 'rgba(56, 189, 248, 0.4)',
@@ -1003,9 +1097,10 @@ const styles = StyleSheet.create({
   },
   catalogButtonText: {
     color: '#38bdf8',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 'bold',
-  },
+    whiteSpace: 'nowrap',
+  } as any,
   spinner: {
     paddingHorizontal: 8,
   },
@@ -1039,21 +1134,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   // ==========================================
-  // PANEL DE DIBUJO
+  // PANEL DE DIBUJO RESPONSIVO
   // ==========================================
   controlPanel: {
     position: 'absolute',
     bottom: 24,
-    left: 16,
-    right: 16,
+    left: 12,
+    right: 90, // Deja espacio para el botón de relieve a la derecha
     alignItems: 'center',
     zIndex: 1000,
+    maxWidth: 420,
   },
   primaryButton: {
     backgroundColor: '#2563eb',
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 30,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
@@ -1062,16 +1158,15 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   drawingControls: {
     backgroundColor: 'rgba(15, 23, 42, 0.94)',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 16,
     width: '100%',
-    maxWidth: 480,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
@@ -1081,12 +1176,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   statusRow: {
-    marginBottom: 10,
+    marginBottom: 8,
     alignItems: 'center',
   },
   statusText: {
     color: '#e2e8f0',
-    fontSize: 14,
+    fontSize: 12,
+    textAlign: 'center',
   },
   boldText: {
     fontWeight: 'bold',
@@ -1094,26 +1190,30 @@ const styles = StyleSheet.create({
   },
   hintText: {
     color: '#94a3b8',
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 2,
+    textAlign: 'center',
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 5,
+    width: '100%',
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+    fontSize: 11,
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap',
+  } as any,
   undoButton: {
     backgroundColor: '#475569',
   },
@@ -1143,7 +1243,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 8,
     width: '100%',
-    maxWidth: 480,
+    maxWidth: 520,
     maxHeight: '90%',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
@@ -1188,15 +1288,19 @@ const styles = StyleSheet.create({
   },
   statusSelector: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 12,
   },
   statusOption: {
     flex: 1,
-    paddingVertical: 8,
+    minWidth: 110,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
     borderRadius: 8,
     backgroundColor: '#1e293b',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#334155',
   },
@@ -1216,7 +1320,8 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 12,
     fontWeight: '600',
-  },
+    whiteSpace: 'nowrap',
+  } as any,
   statusOptionTextActive: {
     color: '#ffffff',
     fontWeight: 'bold',
@@ -1565,7 +1670,7 @@ const styles = StyleSheet.create({
   },
   landTypeOption: {
     paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     borderRadius: 8,
     backgroundColor: '#1e293b',
     borderWidth: 1,
@@ -1579,7 +1684,8 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 12,
     fontWeight: '600',
-  },
+    whiteSpace: 'nowrap',
+  } as any,
   landTypeOptionTextActive: {
     color: '#38bdf8',
     fontWeight: 'bold',
@@ -1658,5 +1764,51 @@ const styles = StyleSheet.create({
   fullScreenImage: {
     width: '100%',
     height: '80%',
+  },
+  // ==========================================
+  // CARRUSEL SUPERIOR EN MODAL
+  // ==========================================
+  carouselSection: {
+    marginBottom: 14,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+  },
+  carouselHeaderTitle: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  carouselScrollView: {
+    borderRadius: 8,
+  },
+  carouselSlide: {
+    marginRight: 10,
+    position: 'relative',
+  },
+  carouselImage: {
+    width: 220,
+    height: 140,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    backgroundColor: '#0f172a',
+  },
+  carouselBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  carouselBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

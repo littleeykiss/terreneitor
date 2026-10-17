@@ -13,9 +13,10 @@ export interface MapViewProps {
 	style?: StyleProp<ViewStyle>;
 	initialRegion?: MapRegion;
 	centerCoordinate?: Coordinate | null;
-	mapType?: 'standard' | 'satellite' | 'hybrid';
+	mapType?: 'standard' | 'satellite' | 'hybrid' | 'relief' | 'relieve';
 	onMapPress?: (coord: Coordinate) => void;
 	onPolygonPress?: (polygon: TerrainPolygon) => void;
+	onPhotoPress?: (photoUri: string) => void;
 	activePoints?: Coordinate[];
 	polygons?: TerrainPolygon[];
 	children?: React.ReactNode;
