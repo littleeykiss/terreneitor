@@ -47,6 +47,8 @@ export default function App() {
   const [lotPrice, setLotPrice] = useState<string>('');
   const [lotStatus, setLotStatus] = useState<TerrainStatus>('disponible');
   const [lotNotes, setLotNotes] = useState<string>('');
+  const [lotOwner, setLotOwner] = useState<string>('');
+  const [lotPhone, setLotPhone] = useState<string>('');
   const [calculatedArea, setCalculatedArea] = useState<{ areaM2: number; areaHectares: number }>({
     areaM2: 0,
     areaHectares: 0,
@@ -142,6 +144,8 @@ export default function App() {
     setLotStatus('disponible');
     setLotNotes('');
     setLotAddress('');
+    setLotOwner('');
+    setLotPhone('');
     setShowSaveModal(true);
 
     // Dirección sugerida
@@ -160,6 +164,8 @@ export default function App() {
     setLotPrice(terrain.price ? terrain.price.toString() : '');
     setLotStatus(terrain.status || 'disponible');
     setLotNotes(terrain.notes || '');
+    setLotOwner(terrain.owner || '');
+    setLotPhone(terrain.phone || '');
     setCalculatedArea({
       areaM2: terrain.areaM2,
       areaHectares: terrain.areaHectares,
@@ -183,6 +189,8 @@ export default function App() {
       price: parsedPrice && !isNaN(parsedPrice) ? parsedPrice : undefined,
       status: lotStatus,
       notes: lotNotes.trim() || undefined,
+      owner: lotOwner.trim() || undefined,
+      phone: lotPhone.trim() || undefined,
       coordinates: editingTerrain ? editingTerrain.coordinates : activePoints,
       createdAt: editingTerrain ? editingTerrain.createdAt : Date.now(),
     };
@@ -458,6 +466,27 @@ export default function App() {
               multiline
             />
 
+            {/* Campo: Dueño */}
+            <Text style={styles.inputLabel}>Dueño / Propietario (opcional):</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ej. Juan Pérez García"
+              placeholderTextColor="#64748b"
+              value={lotOwner}
+              onChangeText={setLotOwner}
+            />
+
+            {/* Campo: Teléfono */}
+            <Text style={styles.inputLabel}>Teléfono de contacto (opcional):</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ej. 3312345678"
+              placeholderTextColor="#64748b"
+              keyboardType="phone-pad"
+              value={lotPhone}
+              onChangeText={setLotPhone}
+            />
+
             {/* Campo: Notas */}
             <Text style={styles.inputLabel}>Notas rápidas (opcional):</Text>
             <TextInput
@@ -587,6 +616,18 @@ export default function App() {
                         </Text>
                       )}
 
+                      {terrain.owner && (
+                        <Text style={styles.terrainOwner}>
+                          👤 {terrain.owner}
+                        </Text>
+                      )}
+
+                      {terrain.phone && (
+                        <Text style={styles.terrainPhone}>
+                          📞 {terrain.phone}
+                        </Text>
+                      )}
+
                       {/* Acciones */}
                       <View style={styles.terrainItemActions}>
                         <TouchableOpacity
@@ -601,6 +642,17 @@ export default function App() {
                           onPress={() => handleEditTerrain(terrain)}
                         >
                           <Text style={styles.editButtonText}>✏️ Editar</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.mapsButton}
+                          onPress={() => {
+                            const centroid = calculateCentroid(terrain.coordinates);
+                            const url = `https://www.google.com/maps/search/?api=1&query=${centroid.latitude},${centroid.longitude}`;
+                            Linking.openURL(url);
+                          }}
+                        >
+                          <Text style={styles.mapsButtonText}>🗺️ Cómo llegar</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -1156,5 +1208,30 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: '#f87171',
     fontSize: 12,
+  },
+  terrainOwner: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  terrainPhone: {
+    color: '#6ee7b7',
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  mapsButton: {
+    flex: 2,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.5)',
+  },
+  mapsButtonText: {
+    color: '#6ee7b7',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

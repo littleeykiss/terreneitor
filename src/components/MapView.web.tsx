@@ -222,9 +222,19 @@ export default function MapView({
 					const statusBadge = poly.status
 						? `<div style="margin-top:2px;"><span style="font-size:9px; padding:1px 5px; border-radius:4px; background:${color}; color:#fff; text-transform:uppercase;">${poly.status}</span></div>`
 						: '';
+					const ownerText = poly.owner
+						? `<div style="color:#e2e8f0; font-size:10px; margin-top:3px;">👤 ${poly.owner}</div>`
+						: '';
+					const phoneText = poly.phone
+						? `<div style="color:#6ee7b7; font-size:10px; margin-top:1px;">📞 ${poly.phone}</div>`
+						: '';
+					const cLat = poly.coordinates.reduce((s, c) => s + c.latitude, 0) / poly.coordinates.length;
+					const cLng = poly.coordinates.reduce((s, c) => s + c.longitude, 0) / poly.coordinates.length;
+					const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${cLat},${cLng}`;
+					const mapsLink = `<div style="margin-top:4px;"><a href="${mapsUrl}" target="_blank" style="color:#38bdf8; font-size:10px; text-decoration:underline;">🗺️ Cómo llegar</a></div>`;
 
 					polyLayer.bindTooltip(
-						`<div><b>${poly.name}</b>${areaText}${statusBadge}</div>`,
+						`<div><b>${poly.name}</b>${areaText}${statusBadge}${ownerText}${phoneText}${mapsLink}</div>`,
 						{
 							permanent: true,
 							direction: 'center',
