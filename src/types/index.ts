@@ -8,16 +8,23 @@ export interface Coordinate {
 }
 
 /**
- * Entidad de Terreno (similar a una entidad JPA en Spring Boot: @Entity Terrain)
+ * Estado comercial del terreno
+ */
+export type TerrainStatus = 'disponible' | 'apartado' | 'vendido';
+
+/**
+ * Entidad completa de Terreno (similar a @Entity public class Terrain { ... } en JPA)
  */
 export interface TerrainPolygon {
   id: string;
-  name: string;              // Nombre o etiqueta del terreno (ej. "Lote 14")
-  address?: string;          // Dirección o referencia de ubicación
-  areaM2: number;            // Área en metros cuadrados
+  name: string;              // Nombre o etiqueta (ej. "Lote 14")
+  address?: string;          // Dirección o referencia
+  areaM2: number;            // Área en m²
   areaHectares: number;      // Área en hectáreas
+  price?: number;            // Precio en MXN (opcional)
+  status: TerrainStatus;     // Estado: disponible, apartado o vendido
   notes?: string;            // Notas o descripción rápida
-  coordinates: Coordinate[]; // Vértices del polígono
-  color?: string;            // Color para dibujar el polígono
-  createdAt: number;         // Timestamp de creación
+  coordinates: Coordinate[]; // Vértices geográficos
+  color?: string;            // Color asociado al estado
+  createdAt: number;         // Fecha de registro
 }

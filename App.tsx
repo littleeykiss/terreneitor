@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import MapView from './src/components/MapView';
-import { Coordinate, TerrainPolygon } from './src/types';
+import { Coordinate, TerrainPolygon, TerrainStatus } from './src/types';
 import { searchPlaces, reverseGeocode, PlaceResult } from './src/services/geocoding';
 import { calculatePolygonArea, calculateCentroid } from './src/utils/geoUtils';
 import { terrainRepository } from './src/repositories/terrainRepository';
@@ -35,11 +35,15 @@ export default function App() {
   const [isSearching, setIsSearching] = useState<boolean>(false);
 
   // ==========================================
-  // MODAL 1: GUARDAR Y ETIQUETAR TERRENO
+  // MODAL 1: GUARDAR / EDITAR FICHA DE TERRENO
   // ==========================================
   const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
+  const [editingTerrain, setEditingTerrain] = useState<TerrainPolygon | null>(null);
+
   const [lotName, setLotName] = useState<string>('');
   const [lotAddress, setLotAddress] = useState<string>('');
+  const [lotPrice, setLotPrice] = useState<string>('');
+  const [lotStatus, setLotStatus] = useState<TerrainStatus>('disponible');
   const [lotNotes, setLotNotes] = useState<string>('');
   const [calculatedArea, setCalculatedArea] = useState<{ areaM2: number; areaHectares: number }>({
     areaM2: 0,
@@ -51,12 +55,12 @@ export default function App() {
   // MODAL 2: BODEGA / CATÁLOGO DE TERRENOS
   // ==========================================
   const [showCatalogModal, setShowCatalogModal] = useState<boolean>(false);
+  const [filterStatus, setFilterStatus] = useState<string>('todos');
 
   // ==========================================
-  // CARGA INICIAL (Cargar terrenos guardados)
+  // CARGA INICIAL
   // ==========================================
   useEffect(() => {
-    // Al abrir la app, recuperamos los terrenos de la base local (AsyncStorage/localStorage)
     terrainRepository.getAll().then((loaded) => {
       setPolygons(loaded);
     });
@@ -107,22 +111,23 @@ export default function App() {
     setIsDrawing(false);
   };
 
-  // Al presionar "Terminar": calculamos el área y abrimos el modal de etiquetado
+  // Terminar dibujo -> abre modal de guardado
   const handleFinishDrawing = async () => {
     if (activePoints.length < 3) return;
 
-    // 1. Calcular área con @turf/area
     const area = calculatePolygonArea(activePoints);
     setCalculatedArea(area);
 
-    // 2. Pre-llenar valores por defecto
+    setEditingTerrain(null); // Nuevo terreno
     const defaultLotNumber = polygons.length + 1;
     setLotName(`Terreno #${defaultLotNumber}`);
+    setLotPrice('');
+    setLotStatus('disponible');
     setLotNotes('');
     setLotAddress('');
     setShowSaveModal(true);
 
-    // 3. Obtener la dirección aproximada en segundo plano
+    // Dirección sugerida
     const centroid = calculateCentroid(activePoints);
     setIsReverseGeocoding(true);
     const address = await reverseGeocode(centroid);
@@ -130,44 +135,67 @@ export default function App() {
     setIsReverseGeocoding(false);
   };
 
-  // Confirmar y guardar el terreno en el repositorio
+  // Abrir modal en modo edición
+  const handleEditTerrain = (terrain: TerrainPolygon) => {
+    setEditingTerrain(terrain);
+    setLotName(terrain.name);
+    setLotAddress(terrain.address || '');
+    setLotPrice(terrain.price ? terrain.price.toString() : '');
+    setLotStatus(terrain.status || 'disponible');
+    setLotNotes(terrain.notes || '');
+    setCalculatedArea({
+      areaM2: terrain.areaM2,
+      areaHectares: terrain.areaHectares,
+    });
+    setShowCatalogModal(false);
+    setShowSaveModal(true);
+  };
+
+  // Guardar (crear o actualizar)
   const handleConfirmSave = async () => {
     if (!lotName.trim()) return;
 
-    const newPolygon: TerrainPolygon = {
-      id: Date.now().toString(),
+    const parsedPrice = lotPrice ? parseFloat(lotPrice.replace(/[^0-9.]/g, '')) : undefined;
+
+    const terrainData: TerrainPolygon = {
+      id: editingTerrain ? editingTerrain.id : Date.now().toString(),
       name: lotName.trim(),
       address: lotAddress.trim() || undefined,
       areaM2: calculatedArea.areaM2,
       areaHectares: calculatedArea.areaHectares,
+      price: parsedPrice && !isNaN(parsedPrice) ? parsedPrice : undefined,
+      status: lotStatus,
       notes: lotNotes.trim() || undefined,
-      coordinates: activePoints,
-      color: '#10b981',
-      createdAt: Date.now(),
+      coordinates: editingTerrain ? editingTerrain.coordinates : activePoints,
+      createdAt: editingTerrain ? editingTerrain.createdAt : Date.now(),
     };
 
-    // Guardar en repositorio (persistencia local)
-    await terrainRepository.save(newPolygon);
+    await terrainRepository.save(terrainData);
 
-    // Actualizar estado reactivo
-    setPolygons((prev) => [newPolygon, ...prev]);
+    const updatedList = await terrainRepository.getAll();
+    setPolygons(updatedList);
+
     setActivePoints([]);
     setIsDrawing(false);
     setShowSaveModal(false);
+    setEditingTerrain(null);
   };
 
-  // Eliminar un terreno de la bodega
   const handleDeleteTerrain = async (id: string) => {
     await terrainRepository.delete(id);
     setPolygons((prev) => prev.filter((p) => p.id !== id));
   };
 
-  // Ver un terreno guardado en el mapa
   const handleFocusTerrain = (terrain: TerrainPolygon) => {
     const centroid = calculateCentroid(terrain.coordinates);
     setCenterCoordinate(centroid);
     setShowCatalogModal(false);
   };
+
+  // Filtrado en la bodega
+  const filteredPolygons = filterStatus === 'todos'
+    ? polygons
+    : polygons.filter((p) => p.status === filterStatus);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -184,19 +212,17 @@ export default function App() {
         centerCoordinate={centerCoordinate}
         onMapPress={handleMapPress}
         onPolygonPress={(poly) => {
-          // Al hacer clic en un polígono en el mapa, podemos ver sus detalles
-          alert(`📍 ${poly.name}\nÁrea: ${poly.areaM2.toLocaleString('es-MX')} m² (${poly.areaHectares} ha)\n${poly.address || ''}`);
+          handleEditTerrain(poly);
         }}
         activePoints={activePoints}
         polygons={polygons}
       />
 
       {/* =================================================== */}
-      {/* BARRA SUPERIOR: BUSCADOR + BOTÓN CATÁLOGO           */}
+      {/* BARRA SUPERIOR: BUSCADOR + BOTÓN BODEGA             */}
       {/* =================================================== */}
       <View style={styles.topContainer}>
         <View style={styles.searchRow}>
-          {/* Buscador */}
           <View style={styles.searchBar}>
             <TextInput
               style={styles.searchInput}
@@ -230,7 +256,6 @@ export default function App() {
             )}
           </View>
 
-          {/* Botón Bodega / Catálogo */}
           <TouchableOpacity
             style={styles.catalogButton}
             onPress={() => setShowCatalogModal(true)}
@@ -242,7 +267,7 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        {/* Resultados del buscador */}
+        {/* Sugerencias de búsqueda */}
         {searchResults.length > 0 && (
           <View style={styles.resultsList}>
             {searchResults.map((place) => (
@@ -324,7 +349,7 @@ export default function App() {
       </View>
 
       {/* =================================================== */}
-      {/* MODAL 1: GUARDAR Y ETIQUETAR TERRENO               */}
+      {/* MODAL 1: FICHA DEL TERRENO (Guardar / Editar)       */}
       {/* =================================================== */}
       <Modal
         visible={showSaveModal}
@@ -334,9 +359,11 @@ export default function App() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>🏷️ Guardar Terreno</Text>
+            <Text style={styles.modalTitle}>
+              {editingTerrain ? '✏️ Editar Ficha de Terreno' : '🏷️ Guardar Terreno'}
+            </Text>
 
-            {/* Ficha de área calculada con @turf/area */}
+            {/* Ficha de área calculada */}
             <View style={styles.areaBadge}>
               <Text style={styles.areaBadgeTitle}>Área calculada:</Text>
               <Text style={styles.areaBadgeValue}>
@@ -345,14 +372,57 @@ export default function App() {
               </Text>
             </View>
 
+            {/* Selector de Estado Comercial */}
+            <Text style={styles.inputLabel}>Estado comercial:</Text>
+            <View style={styles.statusSelector}>
+              {(['disponible', 'apartado', 'vendido'] as TerrainStatus[]).map((st) => {
+                const isActive = lotStatus === st;
+                return (
+                  <TouchableOpacity
+                    key={st}
+                    style={[
+                      styles.statusOption,
+                      isActive && (
+                        st === 'disponible' ? styles.statusOptDisponible :
+                        st === 'apartado' ? styles.statusOptApartado :
+                        styles.statusOptVendido
+                      ),
+                    ]}
+                    onPress={() => setLotStatus(st)}
+                  >
+                    <Text
+                      style={[
+                        styles.statusOptionText,
+                        isActive && styles.statusOptionTextActive,
+                      ]}
+                    >
+                      {st === 'disponible' ? '🟢 Disponible' :
+                       st === 'apartado' ? '🟡 Apartado' : '🔴 Vendido'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             {/* Campo: Nombre / Etiqueta */}
             <Text style={styles.inputLabel}>Nombre o Etiqueta:</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Ej. Terreno Los Laureles - Lote 3"
+              placeholder="Ej. Lote 14 - Fracc. El Roble"
               placeholderTextColor="#64748b"
               value={lotName}
               onChangeText={setLotName}
+            />
+
+            {/* Campo: Precio */}
+            <Text style={styles.inputLabel}>Precio en MXN (opcional):</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ej. 1250000"
+              placeholderTextColor="#64748b"
+              keyboardType="numeric"
+              value={lotPrice}
+              onChangeText={setLotPrice}
             />
 
             {/* Campo: Dirección */}
@@ -375,7 +445,7 @@ export default function App() {
             <Text style={styles.inputLabel}>Notas rápidas (opcional):</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Ej. Frente a calle pavimentada, con luz..."
+              placeholder="Ej. Terreno plano, agua y luz..."
               placeholderTextColor="#64748b"
               value={lotNotes}
               onChangeText={setLotNotes}
@@ -387,14 +457,16 @@ export default function App() {
                 style={styles.modalCancelButton}
                 onPress={() => setShowSaveModal(false)}
               >
-                <Text style={styles.modalCancelText}>Descartar</Text>
+                <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.modalSaveButton}
                 onPress={handleConfirmSave}
               >
-                <Text style={styles.modalSaveText}>💾 Guardar en Bodega</Text>
+                <Text style={styles.modalSaveText}>
+                  {editingTerrain ? '💾 Guardar Cambios' : '💾 Guardar en Bodega'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -413,7 +485,7 @@ export default function App() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, styles.catalogCard]}>
             <View style={styles.catalogHeader}>
-              <Text style={styles.modalTitle}>📁 Bodega de Terrenos</Text>
+              <Text style={styles.modalTitle}>📁 Bodega de Terrenos ({polygons.length})</Text>
               <TouchableOpacity
                 onPress={() => setShowCatalogModal(false)}
                 style={styles.closeModalButton}
@@ -422,63 +494,108 @@ export default function App() {
               </TouchableOpacity>
             </View>
 
-            {polygons.length === 0 ? (
+            {/* Filtros por estado */}
+            <View style={styles.filterRow}>
+              {['todos', 'disponible', 'apartado', 'vendido'].map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  style={[
+                    styles.filterChip,
+                    filterStatus === f && styles.filterChipActive,
+                  ]}
+                  onPress={() => setFilterStatus(f)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      filterStatus === f && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {filteredPolygons.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>🏞️</Text>
-                <Text style={styles.emptyTitle}>Aún no hay terrenos guardados</Text>
+                <Text style={styles.emptyTitle}>No hay terrenos en esta categoría</Text>
                 <Text style={styles.emptySubtitle}>
-                  Usa el botón "Dibujar terreno" en el mapa para delimitar tu primer lote y guardarlo.
+                  Usa "Dibujar terreno" en el mapa para registrar nuevos lotes.
                 </Text>
               </View>
             ) : (
               <ScrollView style={styles.catalogScroll}>
-                {polygons.map((terrain) => (
-                  <View key={terrain.id} style={styles.terrainItem}>
-                    <View style={styles.terrainItemHeader}>
-                      <Text style={styles.terrainItemName}>{terrain.name}</Text>
-                      <View style={styles.areaTag}>
-                        <Text style={styles.areaTagText}>
-                          {terrain.areaM2.toLocaleString('es-MX')} m²
+                {filteredPolygons.map((terrain) => {
+                  const statusColors: Record<string, string> = {
+                    disponible: '#10b981',
+                    apartado: '#f59e0b',
+                    vendido: '#ef4444',
+                  };
+                  const color = statusColors[terrain.status] || '#10b981';
+
+                  return (
+                    <View key={terrain.id} style={styles.terrainItem}>
+                      <View style={styles.terrainItemHeader}>
+                        <Text style={styles.terrainItemName}>{terrain.name}</Text>
+                        <View style={[styles.statusBadge, { borderColor: color, backgroundColor: `${color}22` }]}>
+                          <Text style={[styles.statusBadgeText, { color }]}>
+                            {terrain.status.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Área y precio */}
+                      <View style={styles.terrainMetricsRow}>
+                        <Text style={styles.metricText}>
+                          📐 {terrain.areaM2.toLocaleString('es-MX')} m² ({terrain.areaHectares} ha)
                         </Text>
+                        {terrain.price && (
+                          <Text style={styles.priceText}>
+                            💰 ${terrain.price.toLocaleString('es-MX')} MXN
+                          </Text>
+                        )}
+                      </View>
+
+                      {terrain.address && (
+                        <Text style={styles.terrainAddress} numberOfLines={2}>
+                          📍 {terrain.address}
+                        </Text>
+                      )}
+
+                      {terrain.notes && (
+                        <Text style={styles.terrainNotes} numberOfLines={2}>
+                          📝 {terrain.notes}
+                        </Text>
+                      )}
+
+                      {/* Acciones */}
+                      <View style={styles.terrainItemActions}>
+                        <TouchableOpacity
+                          style={styles.viewOnMapButton}
+                          onPress={() => handleFocusTerrain(terrain)}
+                        >
+                          <Text style={styles.viewOnMapText}>🔍 Ver en mapa</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.editButton}
+                          onPress={() => handleEditTerrain(terrain)}
+                        >
+                          <Text style={styles.editButtonText}>✏️ Editar</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.deleteButton}
+                          onPress={() => handleDeleteTerrain(terrain.id)}
+                        >
+                          <Text style={styles.deleteButtonText}>🗑️</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-
-                    {terrain.areaHectares > 0 && (
-                      <Text style={styles.hectaresText}>
-                        Equivalente a: {terrain.areaHectares} ha
-                      </Text>
-                    )}
-
-                    {terrain.address && (
-                      <Text style={styles.terrainAddress} numberOfLines={2}>
-                        📍 {terrain.address}
-                      </Text>
-                    )}
-
-                    {terrain.notes && (
-                      <Text style={styles.terrainNotes} numberOfLines={2}>
-                        📝 {terrain.notes}
-                      </Text>
-                    )}
-
-                    {/* Acciones del terreno */}
-                    <View style={styles.terrainItemActions}>
-                      <TouchableOpacity
-                        style={styles.viewOnMapButton}
-                        onPress={() => handleFocusTerrain(terrain)}
-                      >
-                        <Text style={styles.viewOnMapText}>🔍 Ver en mapa</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.deleteButton}
-                        onPress={() => handleDeleteTerrain(terrain.id)}
-                      >
-                        <Text style={styles.deleteButtonText}>🗑️ Borrar</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </ScrollView>
             )}
           </View>
@@ -503,7 +620,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   // ==========================================
-  // TOP BAR (Buscador + Bodega)
+  // TOP BAR
   // ==========================================
   topContainer: {
     position: 'absolute',
@@ -615,7 +732,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   // ==========================================
-  // PANEL DE DIBUJO (Inferior)
+  // PANEL DE DIBUJO
   // ==========================================
   controlPanel: {
     position: 'absolute',
@@ -703,7 +820,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   // ==========================================
-  // MODALES (Guardado y Bodega)
+  // MODALES
   // ==========================================
   modalOverlay: {
     flex: 1,
@@ -738,7 +855,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   areaBadgeTitle: {
     color: '#6ee7b7',
@@ -756,11 +873,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'normal',
   },
+  statusSelector: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  statusOption: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  statusOptDisponible: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: '#10b981',
+  },
+  statusOptApartado: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderColor: '#f59e0b',
+  },
+  statusOptVendido: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: '#ef4444',
+  },
+  statusOptionText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statusOptionTextActive: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
   inputLabel: {
     color: '#cbd5e1',
     fontSize: 13,
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 5,
   },
   labelRow: {
     flexDirection: 'row',
@@ -776,16 +928,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e293b',
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
     color: '#ffffff',
     fontSize: 14,
     borderWidth: 1,
     borderColor: '#334155',
-    marginBottom: 12,
+    marginBottom: 10,
     outlineStyle: 'none',
   } as any,
   addressInput: {
-    height: 60,
+    height: 50,
     textAlignVertical: 'top',
   },
   modalButtonRow: {
@@ -815,16 +967,18 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: 'bold',
   },
-  // Estilos de la Bodega / Catálogo
+  // ==========================================
+  // BODEGA / CATÁLOGO
+  // ==========================================
   catalogCard: {
-    maxHeight: '80%',
+    maxHeight: '82%',
     display: 'flex',
   },
   catalogHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   closeModalButton: {
     padding: 6,
@@ -833,6 +987,31 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 12,
+  },
+  filterChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  filterChipActive: {
+    backgroundColor: '#2563eb',
+    borderColor: '#3b82f6',
+  },
+  filterChipText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: '#ffffff',
   },
   catalogScroll: {
     flexGrow: 0,
@@ -870,7 +1049,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   terrainItemName: {
     color: '#ffffff',
@@ -878,23 +1057,31 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
   },
-  areaTag: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#10b981',
   },
-  areaTagText: {
-    color: '#6ee7b7',
-    fontSize: 12,
+  statusBadgeText: {
+    fontSize: 11,
     fontWeight: 'bold',
   },
-  hectaresText: {
-    color: '#93c5fd',
-    fontSize: 12,
+  terrainMetricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
+  },
+  metricText: {
+    color: '#6ee7b7',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  priceText: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: 'bold',
   },
   terrainAddress: {
     color: '#cbd5e1',
@@ -924,21 +1111,33 @@ const styles = StyleSheet.create({
   },
   viewOnMapText: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  editButton: {
+    flex: 1.5,
+    backgroundColor: '#334155',
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
     fontWeight: '600',
   },
   deleteButton: {
-    flex: 1,
+    paddingHorizontal: 12,
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
     paddingVertical: 8,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.5)',
   },
   deleteButtonText: {
     color: '#f87171',
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
   },
 });

@@ -78,17 +78,32 @@ export default function MapView({
       ))}
 
       {/* 3. Polígonos de terrenos ya terminados con soporte para clic */}
-      {polygons.map((poly) => (
-        <Polygon
-          key={poly.id}
-          coordinates={poly.coordinates}
-          strokeColor={poly.color || '#10b981'}
-          fillColor="rgba(16, 185, 129, 0.35)"
-          strokeWidth={3}
-          tappable
-          onPress={() => onPolygonPress?.(poly)}
-        />
-      ))}
+      {polygons.map((poly) => {
+        const statusColors: Record<string, string> = {
+          disponible: '#10b981',
+          apartado: '#f59e0b',
+          vendido: '#ef4444',
+        };
+        const color = poly.color || statusColors[poly.status] || '#10b981';
+
+        return (
+          <Polygon
+            key={poly.id}
+            coordinates={poly.coordinates}
+            strokeColor={color}
+            fillColor={
+              poly.status === 'vendido'
+                ? 'rgba(239, 68, 68, 0.35)'
+                : poly.status === 'apartado'
+                ? 'rgba(245, 158, 11, 0.35)'
+                : 'rgba(16, 185, 129, 0.35)'
+            }
+            strokeWidth={3}
+            tappable
+            onPress={() => onPolygonPress?.(poly)}
+          />
+        );
+      })}
 
       {children}
     </RNMapView>

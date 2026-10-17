@@ -174,9 +174,16 @@ export default function MapView({
       ]);
 
       if (latLngs.length >= 3) {
+        const statusColors: Record<string, string> = {
+          disponible: '#10b981',
+          apartado: '#f59e0b',
+          vendido: '#ef4444',
+        };
+        const color = poly.color || statusColors[poly.status] || '#10b981';
+
         const polyLayer = L.polygon(latLngs, {
-          color: poly.color || '#10b981',
-          fillColor: poly.color || '#10b981',
+          color: color,
+          fillColor: color,
           fillOpacity: 0.35,
           weight: 3,
         }).addTo(polygonLayerRef.current!);
@@ -186,9 +193,12 @@ export default function MapView({
           const areaText = poly.areaM2
             ? `<div style="color: #38bdf8; font-size: 10px;">${poly.areaM2.toLocaleString('es-MX', { maximumFractionDigits: 1 })} m²</div>`
             : '';
+          const statusBadge = poly.status
+            ? `<div style="margin-top:2px;"><span style="font-size:9px; padding:1px 5px; border-radius:4px; background:${color}; color:#fff; text-transform:uppercase;">${poly.status}</span></div>`
+            : '';
 
           polyLayer.bindTooltip(
-            `<div><b>${poly.name}</b>${areaText}</div>`,
+            `<div><b>${poly.name}</b>${areaText}${statusBadge}</div>`,
             {
               permanent: true,
               direction: 'center',
@@ -199,7 +209,9 @@ export default function MapView({
 
         // Al hacer clic en un polígono existente
         polyLayer.on('click', (e: L.LeafletMouseEvent) => {
-          L.DomEvent.stopPropagation(e);
+          if (e.originalEvent) {
+            L.DomEvent.stopPropagation(e.originalEvent);
+          }
           if (onPolygonPressRef.current) {
             onPolygonPressRef.current(poly);
           }
